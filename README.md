@@ -1,6 +1,6 @@
 # RumahAsa — Sistem Pendataan Digital Rumah Tidak Layak Huni (RTLH)
 
-RumahAsa adalah aplikasi digital berbasis web untuk mendata, menilai kelayakan, menetapkan penerima bantuan, dan memantau renovasi Rumah Tidak Layak Huni (RTLH), sebagai pendukung **SDG 11 (Kota dan Permukiman yang Berkelanjutan)**. Dikembangkan oleh **Kelompok 5**, S1 Sistem Informasi - Kampus Surabaya, Fakultas Rekayasa Industri, Universitas Telkom, untuk mata kuliah **BBK3EAB3 - Proyek Perangkat Lunak** (Dosen Pengampu: Dr. Berlian Rahmy Lidiawaty, S.ST., M.MT.).
+RumahAsa adalah aplikasi digital berbasis web untuk mendata, menilai kelayakan, menetapkan penerima bantuan, dan memantau renovasi Rumah Tidak Layak Huni (RTLH), sebagai pendukung **SDG 11 (Kota dan Permukiman yang Berkelanjutan)**. Dikembangkan oleh **Kelompok 5**, Program Studi S1 Sistem Informasi - Kampus Surabaya, Fakultas Rekayasa Industri, Universitas Telkom, untuk mata kuliah **BBK3EAB3 - Proyek Perangkat Lunak** (Dosen Pengampu: Dr. Berlian Rahmy Lidiawaty, S.ST., M.MT.).
 
 Aplikasi ini dikembangkan dengan metode Scrum dengan alat bantu pemantauan hasil pekerjaan menggunakan Jira board "RumahAsa - SCRUM" (Sprint 0: Minggu 1–8; Sprint 1: Minggu 9–15).
 
@@ -43,13 +43,13 @@ Aplikasi ini dikembangkan dengan metode Scrum dengan alat bantu pemantauan hasil
 | PHP | 8.3 atau lebih baru | Bahasa pemrograman server |
 | PostgreSQL | 16 atau lebih baru (anggota tim memakai versi berbeda, mis. 18) | Basis data utama |
 | Blade | Bawaan Laravel | Templating tampilan |
-| Tailwind CSS | [ISI: cek dengan `npm ls tailwindcss`] | Styling antarmuka |
-| Alpine.js | [ISI: cek dengan `npm ls alpinejs`] | Interaksi ringan di sisi klien |
-| Vite + npm | [ISI: versi Node.js yang disepakati tim] | Build dan dev server aset frontend |
+| Tailwind CSS | 4.3.3 | Styling antarmuka |
+| Alpine.js | 3.17.5 | Interaksi ringan di sisi klien |
+| Vite + npm | 8.0.0 | Build dan dev server aset frontend |
 | Composer | 2.x | Manajer paket PHP |
 | Laravel Excel | [ISI: setelah dipasang] | Ekspor laporan Excel |
 | DomPDF | [ISI: setelah dipasang] | Ekspor laporan PDF |
-| PHPUnit / Pest | [ISI: sesuai yang dipakai tim] | Pengujian otomatis |
+| PHPUnit / Pest | PHPUnit 12.5.40 | Pengujian otomatis |
 | Git + GitHub | Terbaru | Kontrol versi |
 | Jira | – | Manajemen backlog Scrum |
 | Figma, draw.io / Mermaid | – | Mockup dan diagram |
@@ -163,6 +163,7 @@ Situs otomatis tersedia di `http://rumahasa.test` (nama folder dalam huruf kecil
 
 Lanjut ke [Langkah Umum](#langkah-umum-semua-os).
 
+
 ### Skenario Windows (Laragon / XAMPP)
 
 **Langkah 1 — Pasang Laragon (Full)** dari situs resmi, atau XAMPP. Pastikan PHP yang dipakai **8.3 atau lebih baru** (di Laragon: menu *PHP → Version*). Pasang juga Composer, Node.js LTS, dan Git for Windows. Buka **Git Bash** atau terminal Laragon untuk semua perintah di bawah.
@@ -224,6 +225,7 @@ sudo -u postgres createdb -O rumahasa db_rumahasa
 ```
 
 Pastikan PHP yang terpasang ≥ 8.3 (`php -v`); jika repositori distro menyediakan versi lebih lama, gunakan repositori PPA/Sury. Lalu clone proyek dan lanjut ke langkah umum. Produksi memakai Ubuntu LTS + Nginx + PHP-FPM + HTTPS.
+
 
 ### Langkah Umum (semua OS)
 
@@ -297,7 +299,7 @@ Pastikan baris `DB_*` di `.env.example` tidak berawalan `#` dan nilainya bukan `
 
 ## Struktur Direktori Proyek (rancangan target)
 
-> **Ini rancangan dari proposal, bukan potret isi repositori saat ini.** Folder dan berkas ditambahkan bertahap sesuai tiket Jira; perbarui bagian ini saat struktur berubah.
+> **Ini rancangan dari proposal, bukan potret isi repositori saat ini.** Folder dan berkas ditambahkan bertahap sesuai tiket Jira; Bagian ini diperbarui saat struktur berubah.
 
 ```
 RumahAsa/
@@ -341,7 +343,9 @@ RumahAsa/
 ├── .env.example                       ← templat konfigurasi (di-commit)
 ├── vite.config.js
 ├── package.json
-└── composer.json
+├── composer.json
+├── Proposal-RumahAsa-v2.0.pdf   ← proposal pengembangan produk (v2.0) yang dikumpulkan ke dosen
+└── README.md
 ```
 
 Prinsip lapisan: *controller* tipis, logika bisnis di `Services`, utilitas teknis di `Support`, otorisasi di `Policies`.
@@ -433,12 +437,15 @@ Setiap perubahan status **wajib** lewat `StatusWorkflow` agar tercatat di `riway
 
 ## Konvensi Commit
 
-Format: `scrum-<nomor>: <kalimat perintah singkat>`. Nomor adalah nomor **sub-task** bila ada, atau nomor tiket induk bila tidak.
+Format: 
+Commit utama: `Initial commit: <kalimat perintah singkat>`. Initial commit dilakukan saat perubahan main, karena branch main di awal menjadi patokan utama proyek.
+Commit fitur: `feat: <kalimat perintah singkat>`. Fitur yang di commit merupakan fitur yang berada pada sub-task, atau task induk apabila tidak. 
 
 ```
-scrum-56: atur koneksi pgsql di .env.example
-scrum-58: tulis README cara menjalankan proyek
-scrum-10: tambah validasi form login
+Initial commit: Buat proyek Laravel dan push ke repository GitHub
+Initial commit: Tulis aturan branching dan README cara menjalankan proyek
+feat: tambah Halaman login
+feat: Form tambah dan ubah user
 ```
 
 Satu commit memuat satu perubahan logis. Pesan ditulis dalam bahasa Indonesia atau Inggris, tetapi **konsisten** di seluruh tim.
@@ -447,8 +454,8 @@ Satu commit memuat satu perubahan logis. Pesan ditulis dalam bahasa Indonesia at
 
 ## Pull Request & Review
 
-- Tujuan PR: `develop` (kecuali rilis sprint ke `main`).
-- Judul Pull Request (PR): `SCRUM-<nomor>: <judul tiket induk>`.
+- Tujuan Pull Request (PR): `develop` (kecuali rilis sprint ke `main`).
+- Judul Pull Request (PR): `<SCRUM-<nomor>>: <judul tiket induk>`.
 - Deskripsi minimal: tautan tiket Jira, ringkasan perubahan, cara menguji, dan tangkapan layar bila ada perubahan tampilan.
 - Minimal **1 reviewer** selain pembuat Pull Request (PR); konflik diselesaikan oleh pembuat Pull Request (PR).
 - Metode penggabungan: **Merge commit** (bukan Squash), agar kontribusi tiap anggota pada branch yang sama tetap tercatat.
