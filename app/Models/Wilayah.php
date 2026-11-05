@@ -12,6 +12,8 @@ class Wilayah extends Model
 {
     use SoftDeletes;
 
+    protected $table = 'wilayah';  // FIX: override default plural "wilayahs"
+
     protected $fillable = ['kode', 'nama', 'tingkat', 'parent_id', 'path', 'is_aktif'];
 
     protected $casts = ['is_aktif' => 'boolean'];
@@ -28,7 +30,6 @@ class Wilayah extends Model
         self::TINGKAT_RT        => 4,
     ];
 
-    // Relasi induk-anak
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Wilayah::class, 'parent_id');
@@ -49,14 +50,11 @@ class Wilayah extends Model
         return $this->hasMany(RumahWarga::class);
     }
 
-    // Scope: semua descendant (RT/Kelurahan/RW/Kec) di bawah node ini
     public function scopeDescendants(Builder $q, self $parent): Builder
     {
-        // path parent selalu diawali /{id} — pakai LIKE 'path-parent/%'
         return $q->where('path', 'like', $parent->path . '/%');
     }
 
-    // Validasi: parent.tingkat harus satu jenjang di atas
     public static function isValidParent(?int $parentId, string $childTingkat): bool
     {
         if ($childTingkat === self::TINGKAT_KECAMATAN) {
