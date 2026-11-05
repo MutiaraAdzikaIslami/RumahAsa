@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('path')->nullable();
             $table->timestamps();
 
+            // Self-referencing foreign key untuk hierarki wilayah
             $table->foreign('parent_id')
                 ->references('id')->on('wilayah')
                 ->restrictOnDelete();
