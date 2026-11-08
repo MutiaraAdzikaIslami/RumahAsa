@@ -1,27 +1,32 @@
 <?php
 
+use App\Modules\Auth\Http\Controllers\LoginController;
 use Illuminate\Support\Facades\Route;
 
-/**
- * Routes untuk scrum-56-konfigurasi-database (FOUNDATION).
- *
- * Route auth/dashboard akan didaftarkan bertahap di branch berikutnya:
- *  - scrum-10-login: route /login, /logout
- *  - scrum-11-sesi-logout: route /session/ping
- *  - scrum-12-ganti-password: route /password/change, /password
- *  - scrum-13-kontrol-akses: route group dengan middleware auth
- *  - dst.
- *
- * Untuk scrum-56: hanya root route untuk verifikasi bootstrap Laravel jalan.
- */
+// FR-01: Login routes (public)
+Route::get('/login',  [LoginController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [LoginController::class, 'login']);
+
+// FR-02: Logout placeholder (akan diisi di scrum-11)
+Route::post('/logout', function () {
+    auth()->logout();
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+    return redirect()->route('login');
+})->name('logout');
+
+// Dashboard placeholder (akan diisi di scrum-38)
+Route::get('/dashboard', function () {
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+    return view('dashboard.placeholder', ['user' => auth()->user()]);
+})->name('dashboard');
+
+// Root redirect
 Route::get('/', function () {
-    return response()->json([
-        'app'      => config('app.name'),
-        'status'   => 'ok',
-        'version'  => 'scrum-56',
-        'message'  => 'Laravel RumahAsa foundation berhasil dimuat. Jalankan: php artisan migrate --seed',
-    ]);
+    return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
 });
 
-// Health check Laravel
+// Health check
 Route::get('/up', fn () => response()->json(['status' => 'ok']));

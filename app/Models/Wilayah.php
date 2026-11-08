@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,9 +11,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Wilayah extends Model
 {
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
-    protected $table = 'wilayah';  // FIX: override default plural "wilayahs"
+    protected $table = 'wilayah';
 
     protected $fillable = ['kode', 'nama', 'tingkat', 'parent_id', 'path', 'is_aktif'];
 

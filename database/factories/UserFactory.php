@@ -2,44 +2,47 @@
 
 namespace Database\Factories;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 /**
- * @extends Factory<User>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
  */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
-    protected static ?string $password;
-
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
-            'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
+            'nama'                  => fake()->name(),
+            'username'              => fake()->unique()->userName(),
+            'email'                 => fake()->unique()->safeEmail(),
+            'password'              => Hash::make('password'),
+            'must_change_password'  => false,
+            'is_aktif'              => true,
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
-    public function unverified(): static
+    /** User dengan password sementara (wajib ganti setelah login) */
+    public function mustChangePassword(): static
     {
         return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
+            'must_change_password' => true,
+        ]);
+    }
+
+    /** User yang tidak aktif (dinonaktifkan Admin) */
+    public function nonaktif(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_aktif' => false,
+        ]);
+    }
+
+    /** User dengan password yang sudah ditetapkan */
+    public function withPassword(string $plainPassword): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'password' => Hash::make($plainPassword),
         ]);
     }
 }
