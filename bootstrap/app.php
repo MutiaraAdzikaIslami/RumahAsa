@@ -11,9 +11,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // scrum-13: Register role middleware alias
         $middleware->alias([
-            'role' => \App\Modules\Core\Http\Middleware\RoleMiddleware::class,
+            'role'            => \App\Modules\Core\Http\Middleware\RoleMiddleware::class,
+            'session.timeout' => \App\Modules\Auth\Http\Middleware\SessionTimeout::class,
         ]);
+
+        // scrum-11: Append SessionTimeout ke web group
+        // -> auto-logout berlaku di SEMUA route yang lewat web middleware
+        $middleware->appendToGroup('web', \App\Modules\Auth\Http\Middleware\SessionTimeout::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
