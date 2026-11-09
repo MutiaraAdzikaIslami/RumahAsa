@@ -32,7 +32,7 @@ class RumahPolicyTest extends TestCase
         $rw->update(['path' => $kel->path . '/' . $rw->id]);
         $rt  = Wilayah::create(['kode' => 'RT-T', 'nama' => 'RT 01', 'tingkat' => 'rt', 'parent_id' => $rw->id]);
         $rt->update(['path' => $rw->path . '/' . $rt->id]);
-        return $rt;
+        return $rt->fresh();
     }
 
     private function getWilayahRtLain(): Wilayah
@@ -41,7 +41,7 @@ class RumahPolicyTest extends TestCase
         $kec->update(['path' => '/' . $kec->id]);
         $rt  = Wilayah::create(['kode' => 'RT-T2', 'nama' => 'RT 02', 'tingkat' => 'rt', 'parent_id' => $kec->id]);
         $rt->update(['path' => $kec->path . '/' . $rt->id]);
-        return $rt;
+        return $rt->fresh();
     }
 
     private function getRumah(Wilayah $wilayah, User $surveyor, string $status = 'Draf'): RumahWarga
@@ -64,7 +64,7 @@ class RumahPolicyTest extends TestCase
             'wilayah_id'           => $wilayah->id,
             'surveyor_id'          => $surveyor->id,
             'status'               => $status,
-        ]);
+        ])->load('wilayah');  // eager load supaya policy bisa akses path
     }
 
     public function setUp(): void
