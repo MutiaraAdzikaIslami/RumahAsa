@@ -28,7 +28,7 @@ class UserFactory extends Factory
             'nama' => fake()->name(), // Ubah 'name' menjadi 'nama'
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
+            'password' => static::$password ??= Hash::make('Admin12345'),
             'remember_token' => Str::random(10),
             'role_id' => 1, // Tambahkan default role_id agar factory tidak gagal
         ];

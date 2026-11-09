@@ -3,7 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
-use App\Http\Middleware\EnsurePasswordIsChanged; 
+use App\Http\Middleware\EnsurePasswordIsChanged;
+use App\Http\Middleware\CheckAdmin; // <-- IMPORT MIDDLEWARE DISINI
 
 // 1. Pengalihan Default
 Route::get('/', function () {
@@ -18,7 +19,7 @@ Route::middleware('guest')->group(function () {
 
 // 3. Rute Auth (Sudah Login)
 Route::middleware('auth')->group(function () {
-    
+
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/ganti-password', [AuthController::class, 'showChangePassword'])->name('password.change');
@@ -26,16 +27,15 @@ Route::middleware('auth')->group(function () {
 
     // 4. Rute Terlindungi Penuh (Harus sudah ganti password)
     Route::middleware(EnsurePasswordIsChanged::class)->group(function () {
-        
+
         // KEMBALIKAN KE TAMPILAN BLADE ASLI
         Route::get('/dashboard', function () {
             return view('dashboard');
         })->name('dashboard');
-        
-        // Resource Manajemen User Admin
-        Route::prefix('admin')->name('admin.')->group(function () {
+
+        // Resource Manajemen User Admin (DILINDUNGI CHECKADMIN)
+        Route::prefix('admin')->name('admin.')->middleware(CheckAdmin::class)->group(function () {
             Route::resource('users', UserController::class);
         });
-
     });
 });
