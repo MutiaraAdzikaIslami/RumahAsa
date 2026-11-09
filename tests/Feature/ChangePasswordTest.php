@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class ChangePasswordTest extends TestCase
@@ -43,9 +44,8 @@ class ChangePasswordTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $response->assertSessionHas('success');
 
-        // Verify password berubah di DB
         $user->refresh();
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('NewPassword2025', $user->password));
+        $this->assertTrue(Hash::check('NewPassword2025', $user->password));
         $this->assertFalse($user->must_change_password);
         $this->assertNotNull($user->password_changed_at);
     }
@@ -54,13 +54,13 @@ class ChangePasswordTest extends TestCase
     {
         $this->loginAsUser(false, 'password123');
 
-        $response = $this->from('/password/change')->put('/password', [
+        $response = $this->from(route('password.change'))->put('/password', [
             'current_password'      => 'salahpassword',
             'password'              => 'NewPassword2025',
             'password_confirmation' => 'NewPassword2025',
         ]);
 
-        $response->assertRedirect('/password/change');
+        $response->assertRedirect(route('password.change'));
         $response->assertSessionHasErrors('current_password');
     }
 
@@ -68,13 +68,13 @@ class ChangePasswordTest extends TestCase
     {
         $this->loginAsUser(false, 'password123');
 
-        $response = $this->from('/password/change')->put('/password', [
+        $response = $this->from(route('password.change'))->put('/password', [
             'current_password'      => 'password123',
             'password'              => 'password123',
             'password_confirmation' => 'password123',
         ]);
 
-        $response->assertRedirect('/password/change');
+        $response->assertRedirect(route('password.change'));
         $response->assertSessionHasErrors('password');
     }
 
@@ -82,13 +82,13 @@ class ChangePasswordTest extends TestCase
     {
         $this->loginAsUser(false, 'password123');
 
-        $response = $this->from('/password/change')->put('/password', [
+        $response = $this->from(route('password.change'))->put('/password', [
             'current_password'      => 'password123',
-            'password'              => 'NewPassword@2025', // ada simbol @
+            'password'              => 'NewPassword@2025',
             'password_confirmation' => 'NewPassword@2025',
         ]);
 
-        $response->assertRedirect('/password/change');
+        $response->assertRedirect(route('password.change'));
         $response->assertSessionHasErrors('password');
     }
 
@@ -112,10 +112,8 @@ class ChangePasswordTest extends TestCase
 
     public function test_user_dengan_must_change_password_dipaksa_redirect_ke_form_ganti(): void
     {
-        // Login dengan akun yang must_change_password=true
         $this->loginAsUser(true, 'password123');
 
-        // Akses dashboard -> harus redirect ke password.change
         $response = $this->get('/dashboard');
 
         $response->assertRedirect(route('password.change'));
