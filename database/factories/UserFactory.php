@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Role;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 
@@ -12,13 +13,19 @@ class UserFactory extends Factory
 {
     public function definition(): array
     {
+        // Pastikan RoleSeeder sudah jalan sebelum factory dipanggil.
+        // Default ke role 'surveyor' jika ada, supaya MySQL strict mode tidak error.
+        $role = Role::where('kode', 'surveyor')->first() ?? Role::first();
+
         return [
-            'nama'                  => fake()->name(),
-            'username'              => fake()->unique()->userName(),
-            'email'                 => fake()->unique()->safeEmail(),
-            'password'              => Hash::make('password'),
-            'must_change_password'  => false,
-            'is_aktif'              => true,
+            'role_id'              => $role?->id,
+            'wilayah_id'           => null,
+            'nama'                 => fake()->name(),
+            'username'             => fake()->unique()->userName(),
+            'email'                => fake()->unique()->safeEmail(),
+            'password'             => Hash::make('password'),
+            'must_change_password' => false,
+            'is_aktif'             => true,
         ];
     }
 

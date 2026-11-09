@@ -35,6 +35,16 @@ class UserManagementTest extends TestCase
         return $rt;
     }
 
+    private function makeNonSurveyorUser(string $roleKode = 'verifikator'): User
+    {
+        $role = Role::where('kode', $roleKode)->first();
+        return User::factory()->create([
+            'role_id'    => $role->id,
+            'wilayah_id' => null,
+            'nama'       => 'Nama Lama',
+        ]);
+    }
+
     public function test_admin_bisa_buat_user_dengan_password_sementara(): void
     {
         $surveyorRole = Role::where('kode', 'surveyor')->first();
@@ -65,7 +75,6 @@ class UserManagementTest extends TestCase
             'nama'     => 'Surveyor Tanpa Wilayah',
             'username' => 'surveyortanpawilayah',
             'role_id'  => $surveyorRole->id,
-            // wilayah_id tidak diisi
         ]);
 
         $response->assertStatus(422);
@@ -81,7 +90,7 @@ class UserManagementTest extends TestCase
             'nama'       => 'Verifikator',
             'username'   => 'verifikator1',
             'role_id'    => $verifikatorRole->id,
-            'wilayah_id' => $rt->id,  // salah: verifikator tidak boleh punya wilayah
+            'wilayah_id' => $rt->id,
         ]);
 
         $response->assertStatus(422);
@@ -90,7 +99,8 @@ class UserManagementTest extends TestCase
 
     public function test_admin_bisa_update_user(): void
     {
-        $target = User::factory()->create(['nama' => 'Nama Lama']);
+        // Bikin target sebagai verifikator (boleh wilayah null)
+        $target = $this->makeNonSurveyorUser('verifikator');
 
         $response = $this->actingAs($this->admin)->putJson("/users/{$target->id}", [
             'nama'       => 'Nama Baru',
@@ -106,7 +116,7 @@ class UserManagementTest extends TestCase
 
     public function test_admin_bisa_menonaktifkan_user(): void
     {
-        $target = User::factory()->create(['is_aktif' => true]);
+        $target = $this->makeNonSurveyorUser('verifikator');
 
         $response = $this->actingAs($this->admin)->patchJson("/users/{$target->id}/toggle-aktif");
 
@@ -132,7 +142,7 @@ class UserManagementTest extends TestCase
 
     public function test_admin_bisa_soft_delete_user_lain(): void
     {
-        $target = User::factory()->create();
+        $target = $this->makeNonSurveyorUser('verifikator');
 
         $response = $this->actingAs($this->admin)->deleteJson("/users/{$target->id}");
 
