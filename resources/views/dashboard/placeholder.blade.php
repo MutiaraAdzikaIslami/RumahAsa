@@ -1,34 +1,54 @@
-<!DOCTYPE html>
-<html lang="id" class="h-full bg-slate-50">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RumahAsa ? Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="h-full">
-    <div class="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-        <div class="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
-            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 mb-4">
-                <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+@extends('layouts.app')
+
+@section('title', 'Dashboard')
+
+@section('content')
+<div class="space-y-6">
+    <h1 class="text-2xl font-bold text-slate-900">Dashboard</h1>
+    
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex items-center gap-4 mb-4">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
             </div>
-            <h1 class="text-2xl font-bold text-slate-900 mb-2">Login Berhasil!</h1>
-            <p class="text-slate-600 mb-6">Selamat datang, <strong>{{ $user->nama }}</strong></p>
-            <div class="bg-slate-50 rounded-lg p-4 mb-6 text-left text-sm">
-                <p class="text-slate-500 mb-1">Role:</p>
-                <p class="font-semibold text-slate-900">{{ $user->role->nama }}</p>
-                <p class="text-slate-500 mt-3 mb-1">Status scrum-10:</p>
-                <p class="font-mono text-xs text-emerald-600">Login & session berfungsi</p>
+            <div>
+                <h2 class="text-lg font-semibold text-slate-900">Selamat datang, {{ $user->nama }}</h2>
+                <p class="text-sm text-slate-500">Anda login sebagai {{ $user->role->nama }}</p>
             </div>
-            <form method="POST" action="{{ route('logout') }}" class="inline">
-                @csrf
-                <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition">
-                    Logout
-                </button>
-            </form>
         </div>
     </div>
-</body>
-</html>
+
+    {{-- Info Card --}}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        @can('input-rumah')
+        <a href="{{ route('rumah.create') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition border border-slate-100">
+            <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 mb-3">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+            </div>
+            <h3 class="font-semibold text-slate-900">Input Rumah Baru</h3>
+            <p class="text-xs text-slate-500 mt-1">Daftarkan rumah warga untuk disurvei.</p>
+        </a>
+        @endcan
+
+        <a href="{{ route('rumah.index') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition border border-slate-100">
+            <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 mb-3">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+            </div>
+            <h3 class="font-semibold text-slate-900">Daftar Rumah</h3>
+            <p class="text-xs text-slate-500 mt-1">Lihat dan cari data rumah yang sudah diinput.</p>
+        </a>
+
+        @can('view-audit-log')
+        <a href="{{ route('audit.view') }}" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition border border-slate-100">
+            <div class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 mb-3">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+            </div>
+            <h3 class="font-semibold text-slate-900">Audit Log</h3>
+            <p class="text-xs text-slate-500 mt-1">Pantau riwayat aktivitas sistem.</p>
+        </a>
+        @endcan
+    </div>
+</div>
+@endsection

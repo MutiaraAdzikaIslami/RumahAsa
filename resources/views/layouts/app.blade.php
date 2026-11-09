@@ -11,15 +11,25 @@
 </head>
 <body class="h-full">
     <div class="min-h-screen flex">
-        <aside class="w-64 bg-slate-800 text-slate-100 flex-shrink-0 hidden md:flex flex-col" x-data="{ open: false }">
+        <aside class="w-64 bg-slate-800 text-slate-100 flex-shrink-0 hidden md:flex flex-col">
             <div class="p-4 border-b border-slate-700">
                 <h1 class="text-lg font-bold">RumahAsa</h1>
                 <p class="text-xs text-slate-400 mt-1">{{ auth()->user()?->role?->nama }}</p>
             </div>
             <nav class="flex-1 p-2 space-y-1">
                 <a href="{{ route('dashboard') }}" class="block px-3 py-2 rounded text-sm hover:bg-slate-700 {{ request()->routeIs('dashboard') ? 'bg-slate-700' : '' }}">Dashboard</a>
+                <a href="{{ route('rumah.index') }}" class="block px-3 py-2 rounded text-sm hover:bg-slate-700 {{ request()->routeIs('rumah.*') ? 'bg-slate-700' : '' }}">Daftar Rumah</a>
+                @can('input-rumah')
+                <a href="{{ route('rumah.create') }}" class="block px-3 py-2 rounded text-sm hover:bg-slate-700 {{ request()->routeIs('rumah.create') ? 'bg-slate-700' : '' }}">Input Rumah</a>
+                @endcan
                 @can('manage-wilayah')
                 <a href="{{ route('wilayah.view') }}" class="block px-3 py-2 rounded text-sm hover:bg-slate-700 {{ request()->routeIs('wilayah.*') ? 'bg-slate-700' : '' }}">Kelola Wilayah</a>
+                @endcan
+                @can('manage-users')
+                <a href="{{ route('users.view') }}" class="block px-3 py-2 rounded text-sm hover:bg-slate-700 {{ request()->routeIs('users.*') ? 'bg-slate-700' : '' }}">Kelola User</a>
+                @endcan
+                @can('view-audit-log')
+                <a href="{{ route('audit.view') }}" class="block px-3 py-2 rounded text-sm hover:bg-slate-700 {{ request()->routeIs('audit.*') ? 'bg-slate-700' : '' }}">Audit Log</a>
                 @endcan
             </nav>
             <div class="p-2 border-t border-slate-700">

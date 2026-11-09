@@ -3,19 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-/**
- * @property string $status
- * @property string $kode_registrasi
- * @property Wilayah $wilayah
- */
 class RumahWarga extends Model
 {
-    use SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'rumah_warga';
 
@@ -41,7 +37,6 @@ class RumahWarga extends Model
         'jumlah_anggota' => 'integer',
     ];
 
-    // Status constants (FR-10 + StatusWorkflow)
     public const STATUS_DRAF              = 'Draf';
     public const STATUS_DIAJUKAN          = 'Diajukan';
     public const STATUS_PERLU_PERBAIKAN   = 'Perlu Perbaikan';
@@ -60,7 +55,6 @@ class RumahWarga extends Model
         self::STATUS_SELESAI,
     ];
 
-    // === Relasi ===
     public function wilayah(): BelongsTo
     {
         return $this->belongsTo(Wilayah::class);
@@ -73,7 +67,6 @@ class RumahWarga extends Model
 
     public function survei(): HasMany
     {
-        // Secara ERD 1:0..1 — di-enforce via unique constraint di kolom rumah_id di survei_kelayakan
         return $this->hasMany(SurveiKelayakan::class, 'rumah_id');
     }
 
@@ -87,16 +80,13 @@ class RumahWarga extends Model
         return $this->hasMany(RiwayatStatus::class, 'rumah_id');
     }
 
-    // === Helper ===
     public function bisaDiedit(): bool
     {
-        // FR-12 + UC-05: hanya Draf atau Perlu Perbaikan yang bisa diedit Surveyor
         return in_array($this->status, [self::STATUS_DRAF, self::STATUS_PERLU_PERBAIKAN]);
     }
 
     public function nikTersamar(): string
     {
-        // Tampilkan NIK tersamar 123456****1234 — nilai asli harus didekripsi dulu
         $nik = app(\App\Modules\Core\Services\NikEncryptor::class)->decryptNik($this->nik_enc);
         if (strlen($nik) < 16) return $nik;
         return substr($nik, 0, 6) . str_repeat('*', 6) . substr($nik, -4);
@@ -109,7 +99,6 @@ class RumahWarga extends Model
         return substr($noKk, 0, 4) . str_repeat('*', 8) . substr($noKk, -4);
     }
 
-    // === Scope ===
     public function scopeStatus(Builder $q, string $status): Builder
     {
         return $q->where('status', $status);

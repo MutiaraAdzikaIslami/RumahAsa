@@ -36,6 +36,22 @@ Route::middleware(['auth', 'must.change.pwd'])->group(function () {
         Route::get('/view', fn () => view('users.index'))->name('view');
         require __DIR__ . '/../app/Modules/Users/routes.php';
     });
+
+    // scrum-18: Audit Log (FR-09) — admin only
+    Route::middleware('role:view-audit-log')->prefix('audit')->name('audit.')->group(function () {
+        Route::get('/view', fn () => view('audit.index'))->name('view');
+        require __DIR__ . '/../app/Modules/Audit/routes.php';
+    });
+
+    // scrum-19: Rumah (FR-10, 12, 14)
+    Route::prefix('rumah')->name('rumah.')->group(function () {
+        require __DIR__ . '/../app/Modules/Rumah/routes.php';
+    });
+
+    // scrum-20/21: Survei & Foto (FR-11a, FR-11b)
+    Route::prefix('survei')->name('survei.')->group(function () {
+        require __DIR__ . '/../app/Modules/Survei/routes.php';
+    });
 });
 
 // Root redirect

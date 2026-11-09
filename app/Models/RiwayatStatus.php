@@ -19,7 +19,12 @@ class RiwayatStatus extends Model
         'catatan',
     ];
 
-    public $timestamps = false; // hanya created_at
+    // FIX: Karena $timestamps = false, kita harus cast manual ke datetime
+    protected $casts = [
+        'created_at' => 'datetime',
+    ];
+
+    public $timestamps = false; // tetap false supaya Eloquent gak auto-update updated_at
 
     public function rumah(): BelongsTo
     {
