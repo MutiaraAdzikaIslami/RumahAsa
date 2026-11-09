@@ -21,8 +21,6 @@
                 <p class="font-semibold text-slate-900">{{ $user->role->nama }}</p>
                 <p class="text-slate-500 mt-3 mb-1">Status scrum-10:</p>
                 <p class="font-mono text-xs text-emerald-600">Login & session berfungsi</p>
-                <p class="text-slate-500 mt-3 mb-1">Status scrum-11, 12, 13:</p>
-                <p class="font-mono text-xs text-amber-600">Belum diimplementasi (logout UI, force change password, dst)</p>
             </div>
             <form method="POST" action="{{ route('logout') }}" class="inline">
                 @csrf

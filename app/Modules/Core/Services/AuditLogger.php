@@ -7,10 +7,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-/**
- * FR-09: Service pencatat audit log (append-only).
- * Dipanggil dari modul lain untuk menulis jejak aktivitas penting.
- */
 class AuditLogger
 {
     public function __construct(private Request $request)

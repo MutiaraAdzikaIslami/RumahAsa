@@ -22,7 +22,6 @@ class UserFactory extends Factory
         ];
     }
 
-    /** User dengan password sementara (wajib ganti setelah login) */
     public function mustChangePassword(): static
     {
         return $this->state(fn (array $attributes) => [
@@ -30,7 +29,6 @@ class UserFactory extends Factory
         ]);
     }
 
-    /** User yang tidak aktif (dinonaktifkan Admin) */
     public function nonaktif(): static
     {
         return $this->state(fn (array $attributes) => [
@@ -38,7 +36,6 @@ class UserFactory extends Factory
         ]);
     }
 
-    /** User dengan password yang sudah ditetapkan */
     public function withPassword(string $plainPassword): static
     {
         return $this->state(fn (array $attributes) => [

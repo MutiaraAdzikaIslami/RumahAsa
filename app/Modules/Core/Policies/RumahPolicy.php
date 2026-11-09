@@ -5,15 +5,6 @@ namespace App\Modules\Core\Policies;
 use App\Models\RumahWarga;
 use App\Models\User;
 
-/**
- * FR-04: Policy pembatasan akses rumah.
- *
- * Aturan:
- *  - Surveyor: hanya boleh lihat/ubah rumah di wilayah tugasnya (path descendant)
- *  - Verifikator: lihat semua wilayah, tidak boleh ubah isi survei
- *  - Admin: lihat semua, tidak boleh ubah isi survei (read-only data rumah)
- *  - Pimpinan: read-only, semua wilayah, NIK & No KK tidak ditampilkan penuh
- */
 class RumahPolicy
 {
     public function view(User $user, RumahWarga $rumah): bool

@@ -4,7 +4,6 @@
 
 @section('content')
 <div class="bg-white rounded-2xl shadow-xl p-8 border border-slate-200" x-data="{ showPassword: false }">
-    {{-- Header --}}
     <div class="text-center mb-8">
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 mb-4">
             <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -15,7 +14,6 @@
         <p class="text-sm text-slate-500 mt-1">Sistem Informasi Pendataan RTLH</p>
     </div>
 
-    {{-- Flash messages --}}
     @if (session('status'))
         <div class="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">
             {{ session('status') }}
@@ -28,7 +26,6 @@
         </div>
     @endif
 
-    {{-- Errors --}}
     @if ($errors->any())
         <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
             @foreach ($errors->all() as $error)
@@ -37,7 +34,6 @@
         </div>
     @endif
 
-    {{-- Form --}}
     <form method="POST" action="{{ route('login') }}" class="space-y-5">
         @csrf
 
@@ -98,7 +94,6 @@
         </button>
     </form>
 
-    {{-- Footer info --}}
     <p class="mt-6 text-center text-xs text-slate-400">
         Akun dibuat oleh Admin. Hubungi Admin jika belum punya akun.
     </p>

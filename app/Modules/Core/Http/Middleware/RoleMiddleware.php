@@ -7,13 +7,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * FR-04: Middleware batasi akses route berdasarkan role via Gate.
- *
- * Penggunaan di route:
- *   ->middleware('role:access-admin')
- *   ->middleware('role:access-admin|access-verifikator')  // multi-gate
- */
 class RoleMiddleware
 {
     public function handle(Request $request, Closure $next, string $gate): Response

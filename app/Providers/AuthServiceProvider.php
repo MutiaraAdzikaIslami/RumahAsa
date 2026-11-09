@@ -17,13 +17,11 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        // === Gate untuk 4 role (FR-04) ===
         Gate::define('access-admin',       fn ($user) => $user->role->kode === 'admin');
         Gate::define('access-verifikator', fn ($user) => $user->role->kode === 'verifikator');
         Gate::define('access-pimpinan',    fn ($user) => $user->role->kode === 'pimpinan');
         Gate::define('access-surveyor',    fn ($user) => $user->role->kode === 'surveyor');
 
-        // === Composite gates untuk menu (FR-04 + sidebar filter) ===
         Gate::define('manage-users',    fn ($user) => in_array($user->role->kode, ['admin']));
         Gate::define('manage-wilayah',  fn ($user) => in_array($user->role->kode, ['admin']));
         Gate::define('view-audit-log',  fn ($user) => in_array($user->role->kode, ['admin']));

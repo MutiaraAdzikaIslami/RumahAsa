@@ -8,7 +8,7 @@ class LoginRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // login = public
+        return true;
     }
 
     public function rules(): array
@@ -27,9 +27,6 @@ class LoginRequest extends FormRequest
         ];
     }
 
-    /**
-     * FR-01: throttle by username (per user, bukan per IP).
-     */
     public function throttleKey(): string
     {
         return 'login.attempts:' . strtolower($this->input('username'));

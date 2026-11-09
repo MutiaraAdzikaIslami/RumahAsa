@@ -32,9 +32,6 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-    /**
-     * FR-01: Handle login attempt.
-     */
     public function login(LoginRequest $request)
     {
         $username    = $request->getUsername();
@@ -42,7 +39,6 @@ class LoginController extends Controller
         $maxAttempts = $this->maxAttempts();
         $lockMinutes = $this->lockMinutes();
 
-        // Cek throttle by username
         $attempts = (int) Cache::get($request->throttleKey(), 0);
         if ($attempts >= $maxAttempts) {
             $this->auditLogger->catatLoginGagal($username);
@@ -53,7 +49,6 @@ class LoginController extends Controller
 
         $user = User::where('username', $username)->first();
 
-        // Validasi: user ada + password cocok + is_aktif + tidak terkunci + tidak soft-deleted
         if (
             !$user
             || !Hash::check($password, $user->password)
@@ -61,12 +56,9 @@ class LoginController extends Controller
             || $user->deleted_at !== null
             || $user->isLocked()
         ) {
-            // Increment attempts
             Cache::put($request->throttleKey(), $attempts + 1, now()->addMinutes($lockMinutes));
-
             $this->auditLogger->catatLoginGagal($username);
 
-            // Jika sudah mencapai max-1 ? kunci akun tsb (jika ada)
             if ($user && $attempts + 1 >= $maxAttempts) {
                 $user->update(['locked_until' => now()->addMinutes($lockMinutes)]);
             }
@@ -81,25 +73,21 @@ class LoginController extends Controller
             ]);
         }
 
-        // Sukses: reset attempt counter & locked status
         Cache::forget($request->throttleKey());
         $user->forceFill([
             'failed_login_count' => 0,
             'locked_until'        => null,
         ])->save();
 
-        // Login + regenerate session (anti session fixation)
         auth()->login($user, $request->remember());
         $request->session()->regenerate(true);
 
-        // Audit login success
         $this->auditLogger->catat(
             aksi:      AuditLog::AKSI['LOGIN_SUCCESS'],
             entitas:   'users',
             entitasId: $user->id,
         );
 
-        // FR-03 (akan diaktifkan di scrum-12): redirect ke ganti password jika wajib
         if ($user->must_change_password) {
             return redirect()->route('password.change')
                 ->with('warning', 'Anda menggunakan password sementara. Wajib ganti password sebelum dapat mengakses fitur lain.');
