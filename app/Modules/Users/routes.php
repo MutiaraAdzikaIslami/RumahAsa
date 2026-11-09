@@ -5,7 +5,7 @@ use App\Modules\Users\Http\Controllers\UserController;
 use App\Modules\Users\Http\Controllers\UserFormDataController;
 use Illuminate\Support\Facades\Route;
 
-// scrum-15: Endpoint untuk form user (roles + wilayah tree)
+// scrum-15: Endpoint untuk form user
 Route::get('/form-data',  [UserFormDataController::class, 'index'])->name('form-data');
 Route::get('/roles',      [RoleController::class, 'index'])->name('roles');
 
@@ -17,3 +17,6 @@ Route::put('/{user}',              [UserController::class, 'update'])->name('upd
 Route::patch('/{user}/toggle-aktif', [UserController::class, 'toggleAktif'])->name('toggle-aktif');
 Route::delete('/{user}',           [UserController::class, 'destroy'])->name('destroy');
 Route::post('/{userId}/restore',   [UserController::class, 'restore'])->name('restore');
+
+// scrum-16: Reset password (FR-07) — harus sebelum /{user} supaya route-nya ke-match
+Route::post('/{user}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');

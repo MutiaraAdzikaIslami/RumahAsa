@@ -20,9 +20,6 @@ class UserController extends Controller
     ) {
     }
 
-    /**
-     * List user dengan filter & pagination.
-     */
     public function index(Request $request): JsonResponse
     {
         $query = User::query()
@@ -57,9 +54,6 @@ class UserController extends Controller
         );
     }
 
-    /**
-     * Create user baru. Return password sementara (sekali tampil).
-     */
     public function store(StoreUserRequest $request): JsonResponse
     {
         try {
@@ -104,8 +98,31 @@ class UserController extends Controller
     }
 
     /**
-     * Nonaktifkan / aktifkan kembali user.
+     * FR-07: Admin reset password user.
+     * Generate password sementara baru + set must_change_password=true.
      */
+    public function resetPassword(User $user): JsonResponse
+    {
+        try {
+            $result = $this->service->resetPassword($user);
+
+            $this->auditLogger->catat(
+                aksi:      AuditLog::AKSI['PASSWORD_RESET_BY_ADMIN'],
+                entitas:   'users',
+                entitasId: $user->id,
+                dataBaru:  ['must_change_password' => true, 'password_changed_at' => null],
+            );
+
+            return response()->json([
+                'message'            => 'Password berhasil direset. Password sementara ditampilkan sekali.',
+                'user'               => $result['user']->load('role', 'wilayah'),
+                'password_sementara' => $result['password_sementara'],
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
     public function toggleAktif(User $user): JsonResponse
     {
         try {
