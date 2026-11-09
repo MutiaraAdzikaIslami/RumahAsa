@@ -19,11 +19,23 @@ Route::middleware('auth')->group(function () {
     Route::put('/password',         [PasswordController::class, 'update'])->name('password.update');
 });
 
-// Dashboard placeholder + protected oleh must.change.pwd middleware
+// Dashboard + modul-modul (protected oleh must.change.pwd)
 Route::middleware(['auth', 'must.change.pwd'])->group(function () {
+    // Dashboard placeholder
     Route::get('/dashboard', function () {
         return view('dashboard.placeholder', ['user' => auth()->user()]);
     })->name('dashboard');
+
+    // scrum-17: Kelola Wilayah (FR-08) — admin only
+    Route::middleware('role:manage-wilayah')->prefix('wilayah')->name('wilayah.')->group(function () {
+        // Frontend route: render halaman tree view
+        Route::get('/view', function () {
+            return view('wilayah.index');
+        })->name('view');
+
+        // Backend routes: RESTful API JSON
+        require __DIR__ . '/../app/Modules/Wilayah/routes.php';
+    });
 });
 
 // Root redirect
