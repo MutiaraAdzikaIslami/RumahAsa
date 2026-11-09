@@ -12,17 +12,19 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('wilayah', function (Blueprint $table) {
-            $table->increments('id');
-            $table->unsignedInteger('parent_id')->nullable();
-            $table->enum('tingkat', ['Kecamatan', 'Kelurahan', 'RW', 'RT']);
+            // Gunakan id() yang otomatis bertipe BigInteger (wajib untuk kode BPS 10 digit)
+            $table->id();
+
+            // Gunakan foreignId untuk parent_id agar bertipe unsignedBigInteger
+            $table->foreignId('parent_id')
+                ->nullable()
+                ->constrained('wilayah')
+                ->restrictOnDelete();
+
+            $table->enum('tingkat', ['Provinsi', 'Kabupaten', 'Kota', 'Kecamatan', 'Desa', 'Kelurahan']);
             $table->string('nama');
             $table->string('path')->nullable();
             $table->timestamps();
-
-            // Self-referencing foreign key untuk hierarki wilayah
-            $table->foreign('parent_id')
-                ->references('id')->on('wilayah')
-                ->restrictOnDelete();
         });
     }
 

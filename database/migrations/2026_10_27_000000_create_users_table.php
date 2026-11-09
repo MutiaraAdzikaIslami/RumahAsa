@@ -13,23 +13,26 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            
+
             // Atribut Dasar
             $table->string('nama'); // Selaras dengan ERD berbahasa Indonesia
             $table->string('email')->unique(); // Atribut utama untuk login
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password'); // Standar penamaan Laravel untuk menyimpan hash
-            
+
             // Relasi Role & Wilayah
             $table->unsignedSmallInteger('role_id');
             $table->foreign('role_id')->references('id')->on('roles')->restrictOnDelete();
-            
-            $table->unsignedInteger('wilayah_id')->nullable();
-            $table->foreign('wilayah_id')->references('id')->on('wilayah')->nullOnDelete();
-            
+
+            // PERBAIKAN: Ubah unsignedInteger menjadi foreignId agar selaras dengan BigInteger tabel wilayah
+            $table->foreignId('wilayah_id')
+                ->nullable()
+                ->constrained('wilayah')
+                ->nullOnDelete();
+
             // Status Akun
             $table->boolean('is_aktif')->default(true);
-            
+
             // Logika Wajib Ganti Password (Pembuatan Akun oleh Admin)
             $table->boolean('must_change_password')->default(true);
             $table->timestamp('password_changed_at')->nullable();
