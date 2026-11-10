@@ -3,6 +3,7 @@
 use App\Modules\Auth\Http\Controllers\LoginController;
 use App\Modules\Auth\Http\Controllers\PasswordController;
 use App\Modules\Auth\Http\Controllers\SessionController;
+use App\Modules\Wilayah\Http\Controllers\WilayahController;
 use Illuminate\Support\Facades\Route;
 
 // FR-01: Login routes (public)
@@ -27,7 +28,8 @@ Route::middleware(['auth', 'must.change.pwd'])->group(function () {
 
     // scrum-17: Kelola Wilayah (FR-08) — admin only
     Route::middleware('role:manage-wilayah')->prefix('wilayah')->name('wilayah.')->group(function () {
-        Route::get('/view', fn () => view('wilayah.index'))->name('view');
+        // FIX: Arahkan ke WilayahController@index supaya pagination & filter jalan
+        Route::get('/view', [WilayahController::class, 'index'])->name('view');
         require __DIR__ . '/../app/Modules/Wilayah/routes.php';
     });
 

@@ -4,6 +4,7 @@ namespace App\Modules\Rumah\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\RumahWarga;
+use App\Models\User;
 use App\Models\Wilayah;
 use App\Modules\Core\Services\AuditLogger;
 use App\Modules\Core\Services\NikEncryptor;
@@ -21,6 +22,7 @@ class RumahController extends Controller
     {
         $query = RumahWarga::with(['wilayah', 'surveyor', 'survei']);
 
+        // Policy: Surveyor hanya lihat wilayahnya
         $user = auth()->user();
         if ($user->isSurveyor() && $user->wilayah) {
             $wilayahPath = $user->wilayah->path;
@@ -30,10 +32,14 @@ class RumahController extends Controller
             });
         }
 
+        // FIX: Filter berdasarkan nama lokasi (kelurahan/kecamatan/dll)
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('kode_registrasi', 'like', "%{$search}%")
-                  ->orWhere('nama_kepala_keluarga', 'like', "%{$search}%");
+                  ->orWhere('nama_kepala_keluarga', 'like', "%{$search}%")
+                  ->orWhereHas('wilayah', function ($q2) use ($search) {
+                      $q2->where('nama', 'like', "%{$search}%");
+                  });
             });
         }
 
@@ -59,22 +65,15 @@ class RumahController extends Controller
 
     public function create()
     {
-        $user = auth()->user();
+        // Ambil semua RT untuk dropdown wilayah
+        $rtList = Wilayah::where('tingkat', 'rt')->orderBy('nama')->get();
+        
+        // FIX: Ambil daftar surveyor untuk dropdown (Admin yang input, pilih surveyor)
+        $surveyorList = User::whereHas('role', function ($q) {
+            $q->where('kode', 'surveyor');
+        })->where('is_aktif', true)->orderBy('nama')->get();
 
-        if ($user->isSurveyor() && $user->wilayah) {
-            $wilayahPath = $user->wilayah->path;
-            $rtList = Wilayah::where('tingkat', 'rt')
-                ->where(function ($q) use ($wilayahPath) {
-                    $q->where('path', $wilayahPath)
-                      ->orWhere('path', 'like', $wilayahPath . '/%');
-                })
-                ->orderBy('nama')
-                ->get();
-        } else {
-            $rtList = Wilayah::where('tingkat', 'rt')->orderBy('nama')->get();
-        }
-
-        return view('rumah.create', compact('rtList'));
+        return view('rumah.create', compact('rtList', 'surveyorList'));
     }
 
     public function store(Request $request)
@@ -94,6 +93,8 @@ class RumahController extends Controller
             'latitude'              => 'nullable|numeric',
             'longitude'             => 'nullable|numeric',
             'wilayah_id'            => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
+            // FIX: surveyor_id wajib diisi oleh Admin
+            'surveyor_id'           => 'required|exists:users,id',
         ];
 
         $validated = $request->validate($rules, [
@@ -119,7 +120,7 @@ class RumahController extends Controller
 
         $count = RumahWarga::withTrashed()->count() + 1;
         $validated['kode_registrasi'] = 'RUMAH-' . date('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
-        $validated['surveyor_id'] = auth()->id();
+        // FIX: surveyor_id diambil dari input Admin, bukan auth()->id()
         $validated['status'] = RumahWarga::STATUS_DRAF;
 
         $rumah = RumahWarga::create($validated);
@@ -143,25 +144,16 @@ class RumahController extends Controller
 
     public function edit(RumahWarga $rumah)
     {
-        $user = auth()->user();
-        if ($user->isSurveyor() && $user->wilayah) {
-            $wilayahPath = $user->wilayah->path;
-            $rtList = Wilayah::where('tingkat', 'rt')
-                ->where(function ($q) use ($wilayahPath) {
-                    $q->where('path', $wilayahPath)
-                      ->orWhere('path', 'like', $wilayahPath . '/%');
-                })
-                ->orderBy('nama')
-                ->get();
-        } else {
-            $rtList = Wilayah::where('tingkat', 'rt')->orderBy('nama')->get();
-        }
+        $rtList = Wilayah::where('tingkat', 'rt')->orderBy('nama')->get();
+        $surveyorList = User::whereHas('role', function ($q) {
+            $q->where('kode', 'surveyor');
+        })->where('is_aktif', true)->orderBy('nama')->get();
 
         $nikEncryptor = app(NikEncryptor::class);
         $nikPlain = $rumah->nik_enc ? $nikEncryptor->decryptNik($rumah->nik_enc) : '';
         $noKkPlain = $rumah->no_kk_enc ? $nikEncryptor->decryptNoKk($rumah->no_kk_enc) : '';
 
-        return view('rumah.edit', compact('rumah', 'rtList', 'nikPlain', 'noKkPlain'));
+        return view('rumah.edit', compact('rumah', 'rtList', 'surveyorList', 'nikPlain', 'noKkPlain'));
     }
 
     public function update(Request $request, RumahWarga $rumah)
@@ -181,6 +173,7 @@ class RumahController extends Controller
             'latitude'              => 'nullable|numeric',
             'longitude'             => 'nullable|numeric',
             'wilayah_id'            => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
+            'surveyor_id'           => 'required|exists:users,id',
         ];
 
         $validated = $request->validate($rules);
@@ -203,9 +196,9 @@ class RumahController extends Controller
         }
         unset($validated['nik'], $validated['no_kk']);
 
-        $dataLama = $rumah->only(['nama_kepala_keluarga', 'wilayah_id', 'status']);
+        $dataLama = $rumah->only(['nama_kepala_keluarga', 'wilayah_id', 'surveyor_id', 'status']);
         $rumah->update($validated);
-        $dataBaru = $rumah->only(['nama_kepala_keluarga', 'wilayah_id', 'status']);
+        $dataBaru = $rumah->only(['nama_kepala_keluarga', 'wilayah_id', 'surveyor_id', 'status']);
 
         $this->auditLogger->catat(
             aksi:      AuditLog::AKSI['RUMAH_UPDATE'],

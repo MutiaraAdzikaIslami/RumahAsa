@@ -10,11 +10,12 @@ return new class extends Migration
     {
         Schema::create('wilayah', function (Blueprint $table) {
             $table->id();
-            $table->string('kode', 30)->unique();
+            $table->string('kode', 30)->unique();        
             $table->string('nama', 100);
-            $table->enum('tingkat', ['kecamatan', 'kelurahan', 'rw', 'rt']);
+            // FIX: Ganti enum jadi string supaya support 6 level (provinsi, kabupaten, dll)
+            $table->string('tingkat', 30); 
             $table->foreignId('parent_id')->nullable()->constrained('wilayah')->nullOnDelete();
-            $table->string('path', 255)->nullable();
+            $table->string('path', 255)->nullable()->index();
             $table->boolean('is_aktif')->default(true);
             $table->timestamps();
             $table->softDeletes();

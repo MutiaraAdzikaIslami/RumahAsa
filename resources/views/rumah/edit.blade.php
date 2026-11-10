@@ -81,6 +81,22 @@
             </div>
         </div>
 
+        {{-- Penugasan Surveyor --}}
+        <div>
+            <h2 class="text-lg font-semibold text-slate-900 mb-3 pb-2 border-b">Penugasan Surveyor</h2>
+            <div class="grid grid-cols-1 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Surveyor yang Bertugas</label>
+                    <select name="surveyor_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                        <option value="">Pilih Surveyor...</option>
+                        @foreach ($surveyorList as $surveyor)
+                            <option value="{{ $surveyor->id }}" {{ old('surveyor_id', $rumah->surveyor_id) == $surveyor->id ? 'selected' : '' }}>{{ $surveyor->nama }} ({{ $surveyor->wilayah?->nama ?? 'Tanpa Wilayah' }})</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div>
             <h2 class="text-lg font-semibold text-slate-900 mb-3 pb-2 border-b">Koordinat GPS</h2>
             <div class="flex items-center gap-3 mb-3">

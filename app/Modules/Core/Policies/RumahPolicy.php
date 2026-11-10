@@ -5,6 +5,11 @@ namespace App\Modules\Core\Policies;
 use App\Models\RumahWarga;
 use App\Models\User;
 
+/**
+ * FR-04: Policy pembatasan akses rumah.
+ *
+ * Update: Input rumah sekarang dilakukan oleh Admin (bukan Surveyor)
+ */
 class RumahPolicy
 {
     public function view(User $user, RumahWarga $rumah): bool
@@ -20,9 +25,12 @@ class RumahPolicy
         return false;
     }
 
+    /**
+     * FIX: Hanya Admin yang bisa input rumah (bukan Surveyor)
+     */
     public function create(User $user): bool
     {
-        return $user->isSurveyor();
+        return $user->isAdmin();
     }
 
     public function update(User $user, RumahWarga $rumah): bool
