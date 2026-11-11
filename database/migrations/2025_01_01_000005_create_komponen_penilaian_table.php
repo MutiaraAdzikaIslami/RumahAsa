@@ -6,23 +6,19 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
+        // Master komponen penilaian (7 komponen sesuai panduan RTLH)
         Schema::create('komponen_penilaian', function (Blueprint $table) {
-            $table->smallIncrements('id');
-            $table->string('kode')->unique();
-            $table->string('nama');
-            $table->unsignedSmallInteger('urutan');
+            $table->id();
+            $table->string('kode', 30)->unique();      // struktur, atap, dinding, lantai, luas_ruang, pencahayaan, sanitasi
+            $table->string('nama', 100);
+            $table->unsignedTinyInteger('urutan');     // 1..7
+            $table->text('deskripsi')->nullable();
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('komponen_penilaian');
