@@ -14,8 +14,7 @@ class RumahController extends Controller
 {
     public function __construct(
         private readonly AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -26,14 +25,14 @@ class RumahController extends Controller
             $wilayahPath = $user->wilayah->path;
             $query->whereHas('wilayah', function ($q) use ($wilayahPath) {
                 $q->where('path', $wilayahPath)
-                  ->orWhere('path', 'like', $wilayahPath . '/%');
+                    ->orWhere('path', 'like', $wilayahPath.'/%');
             });
         }
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('kode_registrasi', 'like', "%{$search}%")
-                  ->orWhere('nama_kepala_keluarga', 'like', "%{$search}%");
+                    ->orWhere('nama_kepala_keluarga', 'like', "%{$search}%");
             });
         }
 
@@ -46,7 +45,7 @@ class RumahController extends Controller
             if ($wilayah) {
                 $query->whereHas('wilayah', function ($q) use ($wilayah) {
                     $q->where('id', $wilayah->id)
-                      ->orWhere('path', 'like', $wilayah->path . '/%');
+                        ->orWhere('path', 'like', $wilayah->path.'/%');
                 });
             }
         }
@@ -66,7 +65,7 @@ class RumahController extends Controller
             $rtList = Wilayah::where('tingkat', 'rt')
                 ->where(function ($q) use ($wilayahPath) {
                     $q->where('path', $wilayahPath)
-                      ->orWhere('path', 'like', $wilayahPath . '/%');
+                        ->orWhere('path', 'like', $wilayahPath.'/%');
                 })
                 ->orderBy('nama')
                 ->get();
@@ -83,17 +82,17 @@ class RumahController extends Controller
 
         $rules = [
             'nama_kepala_keluarga' => $isDraft ? 'nullable|string|max:150' : 'required|string|max:150',
-            'nik'                   => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
-            'no_kk'                 => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
-            'jumlah_anggota'        => 'nullable|integer|min:1',
-            'luas_rumah'            => 'nullable|numeric|min:0',
-            'pekerjaan'             => 'nullable|string|max:100',
-            'penghasilan'           => 'nullable|integer|min:0',
-            'status_kepemilikan'    => 'nullable|in:milik_sendiri,sewa,menumpang,lainnya',
-            'alamat'                => $isDraft ? 'nullable|string' : 'required|string',
-            'latitude'              => 'nullable|numeric',
-            'longitude'             => 'nullable|numeric',
-            'wilayah_id'            => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
+            'nik' => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
+            'no_kk' => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
+            'jumlah_anggota' => 'nullable|integer|min:1',
+            'luas_rumah' => 'nullable|numeric|min:0',
+            'pekerjaan' => 'nullable|string|max:100',
+            'penghasilan' => 'nullable|integer|min:0',
+            'status_kepemilikan' => 'nullable|in:milik_sendiri,sewa,menumpang,lainnya',
+            'alamat' => $isDraft ? 'nullable|string' : 'required|string',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'wilayah_id' => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
         ];
 
         $validated = $request->validate($rules, [
@@ -102,7 +101,7 @@ class RumahController extends Controller
         ]);
 
         $nikEncryptor = app(NikEncryptor::class);
-        if (!empty($validated['nik'])) {
+        if (! empty($validated['nik'])) {
             $nikHash = $nikEncryptor->hashNik($validated['nik']);
             $exists = RumahWarga::where('nik_hash', $nikHash)->exists();
             if ($exists) {
@@ -111,24 +110,24 @@ class RumahController extends Controller
             $validated['nik_enc'] = $nikEncryptor->encryptNik($validated['nik']);
             $validated['nik_hash'] = $nikHash;
         }
-        if (!empty($validated['no_kk'])) {
+        if (! empty($validated['no_kk'])) {
             $validated['no_kk_enc'] = $nikEncryptor->encryptNoKk($validated['no_kk']);
             $validated['no_kk_hash'] = $nikEncryptor->hashNoKk($validated['no_kk']);
         }
         unset($validated['nik'], $validated['no_kk']);
 
         $count = RumahWarga::withTrashed()->count() + 1;
-        $validated['kode_registrasi'] = 'RUMAH-' . date('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $validated['kode_registrasi'] = 'RUMAH-'.date('Y').'-'.str_pad($count, 4, '0', STR_PAD_LEFT);
         $validated['surveyor_id'] = auth()->id();
         $validated['status'] = RumahWarga::STATUS_DRAF;
 
         $rumah = RumahWarga::create($validated);
 
         $this->auditLogger->catat(
-            aksi:      AuditLog::AKSI['RUMAH_CREATE'],
-            entitas:   'rumah_warga',
+            aksi: AuditLog::AKSI['RUMAH_CREATE'],
+            entitas: 'rumah_warga',
             entitasId: $rumah->id,
-            dataBaru:  ['kode_registrasi' => $rumah->kode_registrasi],
+            dataBaru: ['kode_registrasi' => $rumah->kode_registrasi],
         );
 
         return redirect()->route('rumah.show', $rumah)
@@ -137,7 +136,15 @@ class RumahController extends Controller
 
     public function show(RumahWarga $rumah)
     {
-        $rumah->load(['wilayah', 'surveyor', 'survei.komponenSurvei.komponen', 'survei.komponenSurvei.opsiKondisi', 'survei.komponenSurvei.foto', 'riwayatStatus']);
+        $rumah->load([
+            'wilayah',
+            'surveyor',
+            'survei.komponenSurvei.komponen',
+            'survei.komponenSurvei.opsiKondisi',
+            'survei.komponenSurvei.foto',
+            'riwayatStatus.user.role',
+        ]);
+
         return view('rumah.show', compact('rumah'));
     }
 
@@ -149,7 +156,7 @@ class RumahController extends Controller
             $rtList = Wilayah::where('tingkat', 'rt')
                 ->where(function ($q) use ($wilayahPath) {
                     $q->where('path', $wilayahPath)
-                      ->orWhere('path', 'like', $wilayahPath . '/%');
+                        ->orWhere('path', 'like', $wilayahPath.'/%');
                 })
                 ->orderBy('nama')
                 ->get();
@@ -170,23 +177,23 @@ class RumahController extends Controller
 
         $rules = [
             'nama_kepala_keluarga' => $isDraft ? 'nullable|string|max:150' : 'required|string|max:150',
-            'nik'                   => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
-            'no_kk'                 => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
-            'jumlah_anggota'        => 'nullable|integer|min:1',
-            'luas_rumah'            => 'nullable|numeric|min:0',
-            'pekerjaan'             => 'nullable|string|max:100',
-            'penghasilan'           => 'nullable|integer|min:0',
-            'status_kepemilikan'    => 'nullable|in:milik_sendiri,sewa,menumpang,lainnya',
-            'alamat'                => $isDraft ? 'nullable|string' : 'required|string',
-            'latitude'              => 'nullable|numeric',
-            'longitude'             => 'nullable|numeric',
-            'wilayah_id'            => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
+            'nik' => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
+            'no_kk' => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
+            'jumlah_anggota' => 'nullable|integer|min:1',
+            'luas_rumah' => 'nullable|numeric|min:0',
+            'pekerjaan' => 'nullable|string|max:100',
+            'penghasilan' => 'nullable|integer|min:0',
+            'status_kepemilikan' => 'nullable|in:milik_sendiri,sewa,menumpang,lainnya',
+            'alamat' => $isDraft ? 'nullable|string' : 'required|string',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'wilayah_id' => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
         ];
 
         $validated = $request->validate($rules);
 
         $nikEncryptor = app(NikEncryptor::class);
-        if (!empty($validated['nik'])) {
+        if (! empty($validated['nik'])) {
             $nikHash = $nikEncryptor->hashNik($validated['nik']);
             $exists = RumahWarga::where('nik_hash', $nikHash)
                 ->where('id', '!=', $rumah->id)
@@ -197,7 +204,7 @@ class RumahController extends Controller
             $validated['nik_enc'] = $nikEncryptor->encryptNik($validated['nik']);
             $validated['nik_hash'] = $nikHash;
         }
-        if (!empty($validated['no_kk'])) {
+        if (! empty($validated['no_kk'])) {
             $validated['no_kk_enc'] = $nikEncryptor->encryptNoKk($validated['no_kk']);
             $validated['no_kk_hash'] = $nikEncryptor->hashNoKk($validated['no_kk']);
         }
@@ -208,11 +215,11 @@ class RumahController extends Controller
         $dataBaru = $rumah->only(['nama_kepala_keluarga', 'wilayah_id', 'status']);
 
         $this->auditLogger->catat(
-            aksi:      AuditLog::AKSI['RUMAH_UPDATE'],
-            entitas:   'rumah_warga',
+            aksi: AuditLog::AKSI['RUMAH_UPDATE'],
+            entitas: 'rumah_warga',
             entitasId: $rumah->id,
-            dataBaru:  $dataBaru,
-            dataLama:  $dataLama,
+            dataBaru: $dataBaru,
+            dataLama: $dataLama,
         );
 
         return redirect()->route('rumah.show', $rumah)

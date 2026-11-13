@@ -52,6 +52,11 @@ Route::middleware(['auth', 'must.change.pwd'])->group(function () {
     Route::prefix('survei')->name('survei.')->group(function () {
         require __DIR__ . '/../app/Modules/Survei/routes.php';
     });
+
+    // FR-15: Review survei (Verifikator) — SCRUM-110 & SCRUM-111
+    Route::middleware('role:access-verifikator')->prefix('verifikator')->name('verifikator.')->group(function () {
+        require __DIR__ . '/../app/Modules/Verifikator/routes.php';
+    });
 });
 
 // Root redirect

@@ -134,23 +134,66 @@
         @endif
     </div>
 
-    {{-- Riwayat Status --}}
+    {{-- Riwayat Status (FR-24: SCRUM-108 & SCRUM-109) --}}
     <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Riwayat Status</h2>
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-slate-900">Riwayat Status</h2>
+            <span class="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-medium">
+                {{ $rumah->riwayatStatus->count() }} Perubahan
+            </span>
+        </div>
+
         @if ($rumah->riwayatStatus->isEmpty())
             <p class="text-slate-500 text-sm">Belum ada riwayat perubahan status.</p>
         @else
-            <ul class="space-y-2">
+            <div class="relative pl-6 border-l-2 border-slate-200 space-y-6">
                 @foreach ($rumah->riwayatStatus as $riwayat)
-                    <li class="flex items-start gap-3 text-sm">
-                        <span class="text-slate-400 text-xs font-mono whitespace-nowrap">{{ $riwayat->created_at->format('d/m/Y H:i') }}</span>
-                        <span class="text-slate-600">{{ $riwayat->status_dari }} → <strong>{{ $riwayat->status_ke }}</strong></span>
-                        @if ($riwayat->catatan)
-                            <span class="text-slate-400 text-xs">({{ $riwayat->catatan }})</span>
-                        @endif
-                    </li>
+                    @php
+                        $colorDari = $badgeColors[$riwayat->status_dari] ?? 'bg-slate-100 text-slate-700';
+                        $colorKe = $badgeColors[$riwayat->status_ke] ?? 'bg-slate-100 text-slate-700';
+                    @endphp
+                    <div class="relative group">
+                        <!-- Dot pada timeline -->
+                        <div class="absolute -left-[31px] top-1.5 w-3.5 h-3.5 rounded-full bg-white border-2 border-emerald-500 group-hover:bg-emerald-500 transition-colors"></div>
+
+                        <div class="bg-slate-50 rounded-lg p-4 border border-slate-100 hover:border-slate-200 transition-colors">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium {{ $colorDari }}">{{ $riwayat->status_dari }}</span>
+                                    <span class="text-slate-400 text-sm">→</span>
+                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $colorKe }}">{{ $riwayat->status_ke }}</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-500 font-mono">
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{{ $riwayat->created_at ? $riwayat->created_at->format('d/m/Y H:i') : '-' }}</span>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-200/60 mt-2">
+                                <div>
+                                    <span class="text-slate-400">Oleh:</span>
+                                    <span class="font-medium text-slate-700">
+                                        {{ $riwayat->user?->nama ?? 'Sistem' }}
+                                    </span>
+                                    @if ($riwayat->user?->role)
+                                        <span class="text-slate-500 text-[11px] bg-slate-200/70 px-1.5 py-0.5 rounded ml-1">
+                                            {{ $riwayat->user->role->nama }}
+                                        </span>
+                                    @endif
+                                </div>
+                                <div>
+                                    <span class="text-slate-400">Catatan:</span>
+                                    <span class="text-slate-700 italic">
+                                        {{ $riwayat->catatan ?: '-' }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 @endforeach
-            </ul>
+            </div>
         @endif
     </div>
 </div>

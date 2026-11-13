@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Modules\Core\Services\NikEncryptor;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -30,20 +31,26 @@ class RumahWarga extends Model
     ];
 
     protected $casts = [
-        'luas_rumah'     => 'decimal:2',
-        'latitude'       => 'decimal:7',
-        'longitude'      => 'decimal:7',
-        'penghasilan'    => 'integer',
+        'luas_rumah' => 'decimal:2',
+        'latitude' => 'decimal:7',
+        'longitude' => 'decimal:7',
+        'penghasilan' => 'integer',
         'jumlah_anggota' => 'integer',
     ];
 
-    public const STATUS_DRAF              = 'Draf';
-    public const STATUS_DIAJUKAN          = 'Diajukan';
-    public const STATUS_PERLU_PERBAIKAN   = 'Perlu Perbaikan';
-    public const STATUS_LAYAK_HUNI        = 'Layak Huni';
-    public const STATUS_PENERIMA_BANTUAN  = 'Penerima Bantuan';
-    public const STATUS_DALAM_RENOVASI    = 'Dalam Renovasi';
-    public const STATUS_SELESAI           = 'Selesai';
+    public const STATUS_DRAF = 'Draf';
+
+    public const STATUS_DIAJUKAN = 'Diajukan';
+
+    public const STATUS_PERLU_PERBAIKAN = 'Perlu Perbaikan';
+
+    public const STATUS_LAYAK_HUNI = 'Layak Huni';
+
+    public const STATUS_PENERIMA_BANTUAN = 'Penerima Bantuan';
+
+    public const STATUS_DALAM_RENOVASI = 'Dalam Renovasi';
+
+    public const STATUS_SELESAI = 'Selesai';
 
     public const STATUS_LIST = [
         self::STATUS_DRAF,
@@ -77,7 +84,7 @@ class RumahWarga extends Model
 
     public function riwayatStatus(): HasMany
     {
-        return $this->hasMany(RiwayatStatus::class, 'rumah_id');
+        return $this->hasMany(RiwayatStatus::class, 'rumah_id')->orderBy('id', 'asc');
     }
 
     public function bisaDiedit(): bool
@@ -87,16 +94,22 @@ class RumahWarga extends Model
 
     public function nikTersamar(): string
     {
-        $nik = app(\App\Modules\Core\Services\NikEncryptor::class)->decryptNik($this->nik_enc);
-        if (strlen($nik) < 16) return $nik;
-        return substr($nik, 0, 6) . str_repeat('*', 6) . substr($nik, -4);
+        $nik = app(NikEncryptor::class)->decryptNik($this->nik_enc);
+        if (strlen($nik) < 16) {
+            return $nik;
+        }
+
+        return substr($nik, 0, 6).str_repeat('*', 6).substr($nik, -4);
     }
 
     public function noKkTersamar(): string
     {
-        $noKk = app(\App\Modules\Core\Services\NikEncryptor::class)->decryptNoKk($this->no_kk_enc);
-        if (strlen($noKk) < 16) return $noKk;
-        return substr($noKk, 0, 4) . str_repeat('*', 8) . substr($noKk, -4);
+        $noKk = app(NikEncryptor::class)->decryptNoKk($this->no_kk_enc);
+        if (strlen($noKk) < 16) {
+            return $noKk;
+        }
+
+        return substr($noKk, 0, 4).str_repeat('*', 8).substr($noKk, -4);
     }
 
     public function scopeStatus(Builder $q, string $status): Builder
