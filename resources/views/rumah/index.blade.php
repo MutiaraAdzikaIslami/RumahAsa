@@ -90,8 +90,13 @@
                         @endphp
                         <span class="px-2 py-0.5 rounded text-xs {{ $color }}">{{ $r->status }}</span>
                     </td>
-                    <td class="py-2 px-3">
+                    <td class="py-2 px-3 whitespace-nowrap space-x-2">
                         <a href="{{ route('rumah.show', $r) }}" class="text-emerald-600 text-xs hover:underline">Detail</a>
+                        @if ($r->status === \App\Models\RumahWarga::STATUS_DIAJUKAN && auth()->user()?->isVerifikator())
+                            <a href="{{ route('verifikator.survei.show', $r) }}" class="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded shadow-sm">
+                                Review
+                            </a>
+                        @endif
                     </td>
                 </tr>
                 @endforeach

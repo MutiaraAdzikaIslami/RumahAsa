@@ -2,7 +2,6 @@
 
 namespace App\Modules\Verifikator\Http\Controllers;
 
-use App\Models\AuditLog;
 use App\Models\RumahWarga;
 use App\Models\Wilayah;
 use App\Modules\Core\Services\AuditLogger;
@@ -17,8 +16,7 @@ class VerifikasiSurveiController extends Controller
         private readonly StatusWorkflow $workflow,
         private readonly AuditLogger $auditLogger,
         private readonly NikEncryptor $nikEncryptor,
-    ) {
-    }
+    ) {}
 
     /**
      * SCRUM-110: Menampilkan antrean survei berstatus Diajukan dari semua wilayah.
@@ -45,7 +43,7 @@ class VerifikasiSurveiController extends Controller
             if ($wilayah) {
                 $query->whereHas('wilayah', function ($q) use ($wilayah) {
                     $q->where('id', $wilayah->id)
-                        ->orWhere('path', 'like', $wilayah->path . '/%');
+                        ->orWhere('path', 'like', $wilayah->path.'/%');
                 });
             }
         }
@@ -102,8 +100,8 @@ class VerifikasiSurveiController extends Controller
             'catatan' => 'required|string|min:5|max:1000',
         ], [
             'catatan.required' => 'Catatan perbaikan wajib diisi.',
-            'catatan.min'      => 'Catatan perbaikan minimal 5 karakter.',
-            'catatan.max'      => 'Catatan perbaikan maksimal 1000 karakter.',
+            'catatan.min' => 'Catatan perbaikan minimal 5 karakter.',
+            'catatan.max' => 'Catatan perbaikan maksimal 1000 karakter.',
         ]);
 
         $this->workflow->mintaPerbaikan($rumah, $validated['catatan'], auth()->user());
@@ -123,12 +121,12 @@ class VerifikasiSurveiController extends Controller
 
         $validated = $request->validate([
             'kategori' => 'required|in:layak_huni,tidak_layak_huni',
-            'catatan'  => 'required|string|min:5|max:1000',
+            'catatan' => 'required|string|min:5|max:1000',
         ], [
             'kategori.required' => 'Pilihan kategori wajib ditentukan (Layak Huni atau Tidak Layak Huni).',
-            'catatan.required'  => 'Catatan alasan penetapan wajib diisi.',
-            'catatan.min'       => 'Catatan alasan minimal 5 karakter.',
-            'catatan.max'       => 'Catatan alasan maksimal 1000 karakter.',
+            'catatan.required' => 'Catatan alasan penetapan wajib diisi.',
+            'catatan.min' => 'Catatan alasan minimal 5 karakter.',
+            'catatan.max' => 'Catatan alasan maksimal 1000 karakter.',
         ]);
 
         $this->workflow->tetapkanKategori($rumah, $validated['kategori'], $validated['catatan'], auth()->user());

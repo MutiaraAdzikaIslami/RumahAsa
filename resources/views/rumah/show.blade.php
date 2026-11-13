@@ -7,6 +7,12 @@
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-slate-900">Detail Rumah</h1>
         <div class="space-x-2">
+            @if ($rumah->status === \App\Models\RumahWarga::STATUS_DIAJUKAN && auth()->user()?->isVerifikator())
+                <a href="{{ route('verifikator.survei.show', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm inline-flex items-center gap-1.5">
+                    <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+                    Review Survei
+                </a>
+            @endif
             @if ($rumah->bisaDiedit())
                 <a href="{{ route('rumah.edit', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Edit Rumah</a>
             @endif
@@ -123,14 +129,41 @@
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-slate-900">Survei Kelayakan</h2>
-            @if ($rumah->bisaDiedit())
-                <a href="{{ route('survei.create', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Isi Survei</a>
-            @endif
+            <div class="space-x-2">
+                @if ($rumah->status === \App\Models\RumahWarga::STATUS_DIAJUKAN && auth()->user()?->isVerifikator())
+                    <a href="{{ route('verifikator.survei.show', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm inline-flex items-center gap-1.5">
+                        <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+                        Review Survei
+                    </a>
+                @endif
+                @if ($rumah->bisaDiedit())
+                    <a href="{{ route('survei.create', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Isi Survei</a>
+                @endif
+            </div>
         </div>
         @if ($rumah->survei->isEmpty())
             <p class="text-slate-500 text-sm">Belum ada survei.</p>
         @else
-            <p class="text-sm text-slate-600">Survei sudah dibuat. Klik "Isi Survei" untuk melanjutkan pengisian.</p>
+            @if ($rumah->status === \App\Models\RumahWarga::STATUS_DIAJUKAN)
+                <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                            <i data-lucide="info" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-xs">Survei Berstatus Diajukan</p>
+                            <p class="text-xs text-blue-700 mt-0.5">Survei kelayakan 7 komponen telah diajukan dan menunggu peninjauan Verifikator.</p>
+                        </div>
+                    </div>
+                    @if (auth()->user()?->isVerifikator())
+                        <a href="{{ route('verifikator.survei.show', $rumah) }}" class="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 underline whitespace-nowrap">
+                            Buka Halaman Review &rarr;
+                        </a>
+                    @endif
+                </div>
+            @else
+                <p class="text-sm text-slate-600">Survei sudah dibuat. Klik "Isi Survei" untuk melanjutkan pengisian.</p>
+            @endif
         @endif
     </div>
 
