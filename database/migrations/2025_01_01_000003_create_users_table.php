@@ -6,19 +6,30 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
+            $table->foreignId('role_id')->constrained('roles')->restrictOnDelete();
+            $table->foreignId('wilayah_id')->nullable()->constrained('wilayah')->nullOnDelete();
+            $table->string('nama', 150);
+            $table->string('username', 50)->unique();
+            $table->string('email', 100)->nullable();
             $table->string('password');
+            // FR-03: flag wajib ganti password
+            $table->boolean('must_change_password')->default(false);
+            $table->timestamp('password_changed_at')->nullable();
+            // FR-01: lock setelah gagal login berulang (per username)
+            $table->timestamp('locked_until')->nullable();
+            $table->unsignedInteger('failed_login_count')->default(0);
+            // FR-05: nonaktifkan tanpa hapus
+            $table->boolean('is_aktif')->default(true);
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index(['role_id', 'is_aktif']);
+            $table->index('wilayah_id');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
@@ -37,13 +48,10 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('users');
     }
 };
