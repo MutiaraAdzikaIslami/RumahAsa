@@ -41,6 +41,13 @@ class PasswordController extends Controller
 
         // Validasi password lama cocok
         if (!Hash::check($request->input('current_password'), $user->password)) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Password lama tidak cocok.',
+                    'errors'  => ['current_password' => ['Password lama tidak cocok.']],
+                ], 422);
+            }
+
             return back()->withErrors([
                 'current_password' => 'Password lama tidak cocok.',
             ])->withInput();
@@ -52,13 +59,28 @@ class PasswordController extends Controller
             'password_changed_at'  => now(),
         ])->save();
 
-        // Audit
+        // Refresh remember token dan regenerasi session untuk keamanan
+        $user->setRememberToken(\Illuminate\Support\Str::random(60));
+        $user->save();
+        $request->session()->regenerate();
+
+        // Audit log
         $this->auditLogger->catat(
             aksi:      AuditLog::AKSI['PASSWORD_CHANGE'],
             entitas:   'users',
             entitasId: $user->id,
             dataBaru:  ['password_changed_at' => now()->toDateTimeString()],
         );
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Password berhasil diganti.',
+                'data'    => [
+                    'must_change_password' => false,
+                    'password_changed_at'  => $user->password_changed_at?->toIso8601String(),
+                ],
+            ]);
+        }
 
         return redirect()
             ->route('dashboard')
