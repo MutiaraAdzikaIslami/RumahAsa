@@ -17,15 +17,22 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        Gate::define('access-admin',       fn ($user) => $user->role->kode === 'admin');
-        Gate::define('access-verifikator', fn ($user) => $user->role->kode === 'verifikator');
-        Gate::define('access-pimpinan',    fn ($user) => $user->role->kode === 'pimpinan');
-        Gate::define('access-surveyor',    fn ($user) => $user->role->kode === 'surveyor');
+        // Role Gates (dengan prefix access- dan nama role langsung)
+        Gate::define('access-admin',       fn ($user) => $user->role?->kode === 'admin');
+        Gate::define('access-verifikator', fn ($user) => $user->role?->kode === 'verifikator');
+        Gate::define('access-pimpinan',    fn ($user) => $user->role?->kode === 'pimpinan');
+        Gate::define('access-surveyor',    fn ($user) => $user->role?->kode === 'surveyor');
 
-        Gate::define('manage-users',    fn ($user) => in_array($user->role->kode, ['admin']));
-        Gate::define('manage-wilayah',  fn ($user) => in_array($user->role->kode, ['admin']));
-        Gate::define('view-audit-log',  fn ($user) => in_array($user->role->kode, ['admin']));
-        Gate::define('input-rumah',     fn ($user) => in_array($user->role->kode, ['surveyor']));
-        Gate::define('view-dashboard',  fn ($user) => in_array($user->role->kode, ['surveyor', 'verifikator', 'admin', 'pimpinan']));
+        Gate::define('admin',       fn ($user) => $user->role?->kode === 'admin');
+        Gate::define('verifikator', fn ($user) => $user->role?->kode === 'verifikator');
+        Gate::define('pimpinan',    fn ($user) => $user->role?->kode === 'pimpinan');
+        Gate::define('surveyor',    fn ($user) => $user->role?->kode === 'surveyor');
+
+        // Permission Gates
+        Gate::define('manage-users',    fn ($user) => in_array($user->role?->kode, ['admin']));
+        Gate::define('manage-wilayah',  fn ($user) => in_array($user->role?->kode, ['admin']));
+        Gate::define('view-audit-log',  fn ($user) => in_array($user->role?->kode, ['admin']));
+        Gate::define('input-rumah',     fn ($user) => in_array($user->role?->kode, ['surveyor']));
+        Gate::define('view-dashboard',  fn ($user) => in_array($user->role?->kode, ['surveyor', 'verifikator', 'admin', 'pimpinan']));
     }
 }
