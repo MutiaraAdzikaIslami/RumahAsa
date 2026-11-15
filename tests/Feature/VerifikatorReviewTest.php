@@ -189,13 +189,13 @@ class VerifikatorReviewTest extends TestCase
         $response = $this->actingAs($this->verifikator)->get("/verifikator/survei/{$rumah->id}");
 
         $response->assertOk();
-        $response->assertSee('Review Survei');
+        $response->assertSee('Review Pengajuan');
         $response->assertSee('Agus Salim');
         $response->assertSee($rumah->kode_registrasi);
-        $response->assertSee('Detail Penilaian 7 Komponen dan Galeri Foto Bukti');
-        $response->assertSee('Foto Bukti Lapangan');
-        $response->assertSee('Minta Perbaikan');
-        $response->assertSee('Tetapkan Kategori');
+        $response->assertSee('Kondisi Rumah');
+        $response->assertSee('Galeri Foto');
+        $response->assertSee('Kembalikan untuk Perbaikan');
+        $response->assertSee('Tetapkan Keputusan');
     }
 
     public function test_verifikator_bisa_minta_perbaikan_dengan_catatan(): void
