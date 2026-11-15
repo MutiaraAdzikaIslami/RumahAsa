@@ -5,11 +5,19 @@ namespace App\Modules\Users\Services;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wilayah;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * FR-05: Service untuk manage user oleh Admin.
+ * FR-05 & FR-06: Service untuk manage user, role, dan wilayah tugas oleh Admin.
+ *
+ * Aturan:
+ *  - Create: generate password sementara acak (12 char), set must_change_password=true
+ *  - Update: hash password baru bila diisi
+ *  - Nonaktifkan: toggle is_aktif (tidak hapus)
+ *  - Delete: soft delete, cek constraint (tidak boleh hapus admin terakhir)
+ *  - Validasi: Surveyor wajib punya wilayah, role lain wilayah kosong (null)
  */
 class UserService
 {
@@ -20,56 +28,64 @@ class UserService
      */
     public function create(array $data): array
     {
-        $this->validateRoleWilayah($data['role_id'] ?? null, $data['wilayah_id'] ?? null);
+        return DB::transaction(function () use ($data) {
+            $this->validateRoleWilayah($data['role_id'] ?? null, $data['wilayah_id'] ?? null);
 
-        $passwordSementara = $this->generatePasswordSementara();
+            $passwordSementara = $this->generatePasswordSementara();
 
-        $user = User::create([
-            'role_id'              => $data['role_id'],
-            'wilayah_id'           => $data['wilayah_id'],
-            'nama'                 => $data['nama'],
-            'username'             => $data['username'],
-            'email'                => $data['email'] ?? null,
-            'password'             => Hash::make($passwordSementara),
-            'must_change_password' => true,
-            'is_aktif'             => $data['is_aktif'] ?? true,
-        ]);
+            $user = User::create([
+                'role_id'              => $data['role_id'],
+                'wilayah_id'           => $data['wilayah_id'] ?? null,
+                'nama'                 => $data['nama'],
+                'username'             => $data['username'],
+                'email'                => $data['email'] ?? null,
+                'password'             => Hash::make($passwordSementara),
+                'must_change_password' => true,
+                'is_aktif'             => $data['is_aktif'] ?? true,
+            ]);
 
-        return ['user' => $user, 'password_sementara' => $passwordSementara];
+            return ['user' => $user, 'password_sementara' => $passwordSementara];
+        });
     }
 
     /**
      * Update user. Password baru di-hash bila diisi.
-     *
-     * PENTING: Pakai array_key_exists() bukan ?? (null coalescing) untuk wilayah_id
-     * supaya bisa bedain "field tidak dikirim" (pakai nilai lama) vs
-     * "field dikirim dengan nilai null" (clear wilayah, mis. dari Surveyor ke Admin).
      */
     public function update(User $user, array $data): User
     {
-        $roleId = array_key_exists('role_id', $data) ? $data['role_id'] : $user->role_id;
-        $wilayahId = array_key_exists('wilayah_id', $data) ? $data['wilayah_id'] : $user->wilayah_id;
+        return DB::transaction(function () use ($user, $data) {
+            $targetRoleId = array_key_exists('role_id', $data) ? $data['role_id'] : $user->role_id;
+            $targetWilayahId = array_key_exists('wilayah_id', $data) ? $data['wilayah_id'] : $user->wilayah_id;
 
-        $this->validateRoleWilayah($roleId, $wilayahId, $user);
+            // Cegah admin mengubah role diri sendiri menjadi non-admin
+            if (auth()->id() === $user->id && $targetRoleId !== $user->role_id) {
+                $targetRole = Role::find($targetRoleId);
+                if ($user->isAdmin() && $targetRole && !$targetRole->isAdmin()) {
+                    throw new \RuntimeException('Anda tidak dapat mengubah role akun sendiri menjadi non-admin.');
+                }
+            }
 
-        $updateData = [
-            'role_id'    => $roleId,
-            'wilayah_id' => $wilayahId,
-            'nama'       => array_key_exists('nama', $data) ? $data['nama'] : $user->nama,
-            'username'   => array_key_exists('username', $data) ? $data['username'] : $user->username,
-            'email'      => array_key_exists('email', $data) ? $data['email'] : $user->email,
-            'is_aktif'   => array_key_exists('is_aktif', $data) ? $data['is_aktif'] : $user->is_aktif,
-        ];
+            $this->validateRoleWilayah($targetRoleId, $targetWilayahId, $user);
 
-        // Hash password baru bila diisi
-        if (!empty($data['password'])) {
-            $updateData['password'] = Hash::make($data['password']);
-            $updateData['must_change_password'] = true;
-        }
+            $updateData = [
+                'role_id'    => $targetRoleId,
+                'wilayah_id' => $targetWilayahId,
+                'nama'       => array_key_exists('nama', $data) ? $data['nama'] : $user->nama,
+                'username'   => array_key_exists('username', $data) ? $data['username'] : $user->username,
+                'email'      => array_key_exists('email', $data) ? $data['email'] : $user->email,
+                'is_aktif'   => array_key_exists('is_aktif', $data) ? $data['is_aktif'] : $user->is_aktif,
+            ];
 
-        $user->update($updateData);
+            // Hash password baru bila diisi
+            if (!empty($data['password'])) {
+                $updateData['password'] = Hash::make($data['password']);
+                $updateData['must_change_password'] = true;
+            }
 
-        return $user->fresh();
+            $user->update($updateData);
+
+            return $user->fresh();
+        });
     }
 
     /**
@@ -77,23 +93,28 @@ class UserService
      */
     public function toggleAktif(User $user): User
     {
-        if (auth()->id() === $user->id) {
-            throw new \RuntimeException('Anda tidak dapat menonaktifkan akun sendiri.');
-        }
-
-        if ($user->isAdmin() && $user->is_aktif) {
-            $adminAktifCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
-                ->where('is_aktif', true)
-                ->whereNull('deleted_at')
-                ->count();
-            if ($adminAktifCount <= 1) {
-                throw new \RuntimeException('Tidak dapat menonaktifkan admin terakhir yang aktif.');
+        return DB::transaction(function () use ($user) {
+            // Cegah admin menonaktifkan diri sendiri
+            if (auth()->id() === $user->id) {
+                throw new \RuntimeException('Anda tidak dapat menonaktifkan akun sendiri.');
             }
-        }
 
-        $user->update(['is_aktif' => !$user->is_aktif]);
+            // Cegah menonaktifkan admin terakhir yang aktif
+            if ($user->isAdmin() && $user->is_aktif) {
+                $adminAktifCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
+                    ->where('is_aktif', true)
+                    ->whereNull('deleted_at')
+                    ->lockForUpdate()
+                    ->count();
+                if ($adminAktifCount <= 1) {
+                    throw new \RuntimeException('Tidak dapat menonaktifkan admin terakhir yang aktif.');
+                }
+            }
 
-        return $user->fresh();
+            $user->update(['is_aktif' => !$user->is_aktif]);
+
+            return $user->fresh();
+        });
     }
 
     /**
@@ -101,20 +122,24 @@ class UserService
      */
     public function delete(User $user): void
     {
-        if (auth()->id() === $user->id) {
-            throw new \RuntimeException('Anda tidak dapat menghapus akun sendiri.');
-        }
-
-        if ($user->isAdmin()) {
-            $adminCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
-                ->whereNull('deleted_at')
-                ->count();
-            if ($adminCount <= 1) {
-                throw new \RuntimeException('Tidak dapat menghapus admin terakhir.');
+        DB::transaction(function () use ($user) {
+            // Cegah admin menghapus diri sendiri
+            if (auth()->id() === $user->id) {
+                throw new \RuntimeException('Anda tidak dapat menghapus akun sendiri.');
             }
-        }
 
-        $user->delete();
+            if ($user->isAdmin()) {
+                $adminCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
+                    ->whereNull('deleted_at')
+                    ->lockForUpdate()
+                    ->count();
+                if ($adminCount <= 1) {
+                    throw new \RuntimeException('Tidak dapat menghapus admin terakhir.');
+                }
+            }
+
+            $user->delete();
+        });
     }
 
     /**
@@ -128,10 +153,11 @@ class UserService
     }
 
     /**
-     * Generate password sementara: 12 char alphanumeric.
+     * Generate password sementara: 12 char alphanumeric (sesuai AlphanumericPassword rule).
      */
     private function generatePasswordSementara(): string
     {
+        // Pastikan ada kombinasi huruf besar, kecil, dan angka
         do {
             $pwd = Str::random(12);
         } while (
@@ -145,7 +171,7 @@ class UserService
     /**
      * Validasi: Surveyor wajib punya wilayah, role lain wilayah harus null.
      */
-    private function validateRoleWilayah(?int $roleId, ?int $wilayahId, ?User $exceptUser = null): void
+    public function validateRoleWilayah(?int $roleId, ?int $wilayahId, ?User $exceptUser = null): void
     {
         if (!$roleId) {
             throw new \InvalidArgumentException('Role wajib dipilih.');
@@ -164,6 +190,7 @@ class UserService
                 throw new \InvalidArgumentException('Wilayah tugas tidak ditemukan.');
             }
         } else {
+            // Verifikator / Admin / Pimpinan: wilayah harus null
             if ($wilayahId) {
                 throw new \InvalidArgumentException(
                     "Role {$role->nama} tidak boleh memiliki wilayah tugas (lihat semua wilayah)."
