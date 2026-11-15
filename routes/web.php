@@ -9,21 +9,33 @@ use Illuminate\Support\Facades\Route;
 Route::get('/login',  [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login']);
 
-// FR-02: Logout & session ping (butuh auth)
+// FR-02: Logout & session ping
 Route::post('/logout',       [SessionController::class, 'logout'])->middleware('auth')->name('logout');
 Route::post('/session/ping', [SessionController::class, 'ping'])->middleware('auth')->name('session.ping');
 
-// FR-03: Ganti password (butuh auth)
+// FR-03: Ganti password
 Route::middleware('auth')->group(function () {
     Route::get('/password/change', [PasswordController::class, 'edit'])->name('password.change');
     Route::put('/password',         [PasswordController::class, 'update'])->name('password.update');
 });
 
-// Dashboard placeholder + protected oleh must.change.pwd middleware
+// Dashboard + modul-modul (protected oleh must.change.pwd)
 Route::middleware(['auth', 'must.change.pwd'])->group(function () {
     Route::get('/dashboard', function () {
         return view('dashboard.placeholder', ['user' => auth()->user()]);
     })->name('dashboard');
+
+    // scrum-17: Kelola Wilayah (FR-08) — admin only
+    Route::middleware('role:manage-wilayah')->prefix('wilayah')->name('wilayah.')->group(function () {
+        Route::get('/view', fn () => view('wilayah.index'))->name('view');
+        require __DIR__ . '/../app/Modules/Wilayah/routes.php';
+    });
+
+    // scrum-14: Kelola User (FR-05) — admin only
+    Route::middleware('role:manage-users')->prefix('users')->name('users.')->group(function () {
+        Route::get('/view', fn () => view('users.index'))->name('view');
+        require __DIR__ . '/../app/Modules/Users/routes.php';
+    });
 });
 
 // Root redirect
@@ -31,5 +43,4 @@ Route::get('/', function () {
     return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
 });
 
-// Health check
 Route::get('/up', fn () => response()->json(['status' => 'ok']));
