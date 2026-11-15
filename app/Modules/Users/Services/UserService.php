@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * FR-05 & FR-06: Service untuk manage user, role, dan wilayah tugas oleh Admin.
+ * FR-05, FR-06 & FR-07: Service untuk manage user, role, wilayah tugas, dan reset password oleh Admin.
  *
  * Aturan:
  *  - Create: generate password sementara acak (12 char), set must_change_password=true
  *  - Update: hash password baru bila diisi
+ *  - Reset Password: Admin generate password sementara baru (12 char), set must_change_password=true, clear lock
  *  - Nonaktifkan: toggle is_aktif (tidak hapus)
  *  - Delete: soft delete, cek constraint (tidak boleh hapus admin terakhir)
  *  - Validasi: Surveyor wajib punya wilayah, role lain wilayah kosong (null)
@@ -49,7 +50,7 @@ class UserService
     }
 
     /**
-     * Update user. Password baru di-hash bila diisi.
+     * Update user. Password baru di-hash bila diisi. Pakai array_key_exists() untuk handle explicit null.
      */
     public function update(User $user, array $data): User
     {
@@ -89,7 +90,45 @@ class UserService
     }
 
     /**
-     * Toggle is_aktif (nonaktifkan / aktifkan kembali).
+     * FR-07: Reset password user oleh Admin.
+     * - Bungkus dalam atomic DB transaction
+     * - Cegah Admin mereset password akun sendiri
+     * - Generate password sementara baru (12 char alphanumeric)
+     * - Set must_change_password = true (wajib ganti saat login berikutnya)
+     * - Clear locked_until & failed_login_count (unlock akun kalau ke-lock)
+     * - Clear password_changed_at = null
+     * - Invalidate remember token lama
+     * - Pertahankan role_id, wilayah_id, dan is_aktif
+     *
+     * @return array{user: User, password_sementara: string}
+     */
+    public function resetPassword(User $user): array
+    {
+        return DB::transaction(function () use ($user) {
+            if (auth()->id() === $user->id) {
+                throw new \RuntimeException('Anda tidak dapat mereset password akun sendiri. Gunakan menu Ganti Password.');
+            }
+
+            $passwordSementara = $this->generatePasswordSementara();
+
+            $user->forceFill([
+                'password'              => Hash::make($passwordSementara),
+                'must_change_password'  => true,
+                'password_changed_at'    => null,
+                'locked_until'           => null,
+                'failed_login_count'     => 0,
+            ])->save();
+
+            // Invalidate remember token
+            $user->setRememberToken(Str::random(60));
+            $user->save();
+
+            return ['user' => $user->fresh(), 'password_sementara' => $passwordSementara];
+        });
+    }
+
+    /**
+     * Toggle is_aktif.
      */
     public function toggleAktif(User $user): User
     {
@@ -142,9 +181,6 @@ class UserService
         });
     }
 
-    /**
-     * Restore user yang di-soft delete.
-     */
     public function restore(int $userId): User
     {
         $user = User::withTrashed()->findOrFail($userId);
