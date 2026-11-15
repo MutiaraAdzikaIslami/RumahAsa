@@ -13,6 +13,7 @@ class RumahManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    private User $admin;
     private User $surveyor;
     private Wilayah $rt;
 
@@ -20,12 +21,19 @@ class RumahManagementTest extends TestCase
     {
         parent::setUp();
         $this->seed(\Database\Seeders\RoleSeeder::class);
-        
+
         // Bikin wilayah RT
         $kec = Wilayah::create(['kode' => 'KEC-T', 'nama' => 'Kec Test', 'tingkat' => 'kecamatan', 'parent_id' => null]);
         $kec->update(['path' => '/' . $kec->id]);
         $this->rt = Wilayah::create(['kode' => 'RT-T', 'nama' => 'RT 01', 'tingkat' => 'rt', 'parent_id' => $kec->id]);
         $this->rt->update(['path' => $kec->path . '/' . $this->rt->id]);
+
+        // Bikin admin (input rumah dilakukan Admin, memilih surveyor)
+        $roleAdmin = Role::where('kode', 'admin')->first();
+        $this->admin = User::factory()->create([
+            'role_id'              => $roleAdmin->id,
+            'must_change_password' => false,
+        ]);
 
         // Bikin surveyor
         $role = Role::where('kode', 'surveyor')->first();
@@ -36,15 +44,16 @@ class RumahManagementTest extends TestCase
         ]);
     }
 
-    public function test_surveyor_bisa_buat_rumah_lengkap(): void
+    public function test_admin_bisa_buat_rumah_lengkap(): void
     {
-        $response = $this->actingAs($this->surveyor)->post('/rumah', [
+        $response = $this->actingAs($this->admin)->post('/rumah', [
             'nama_kepala_keluarga'  => 'Budi Santoso',
             'nik'                   => '1234567890123456',
             'no_kk'                 => '6543210987654321',
             'jumlah_anggota'        => 4,
             'alamat'                => 'Jl. Test No. 123',
             'wilayah_id'            => $this->rt->id,
+            'surveyor_id'           => $this->surveyor->id,
             'action'                => 'save',
         ]);
 
@@ -52,10 +61,11 @@ class RumahManagementTest extends TestCase
         $this->assertDatabaseHas('rumah_warga', ['nama_kepala_keluarga' => 'Budi Santoso']);
     }
 
-    public function test_surveyor_bisa_simpan_draf_kosong(): void
+    public function test_admin_bisa_simpan_draf_kosong(): void
     {
-        $response = $this->actingAs($this->surveyor)->post('/rumah', [
-            'action' => 'draft',
+        $response = $this->actingAs($this->admin)->post('/rumah', [
+            'action'      => 'draft',
+            'surveyor_id' => $this->surveyor->id,
         ]);
 
         $response->assertRedirect();
@@ -67,7 +77,7 @@ class RumahManagementTest extends TestCase
         // Bikin rumah dengan NIK tertentu secara manual (tanpa factory)
         $nikEncryptor = app(\App\Modules\Core\Services\NikEncryptor::class);
         $nik = '1111222233334444';
-        
+
         RumahWarga::create([
             'kode_registrasi'      => 'RUMAH-2026-9999',
             'nama_kepala_keluarga' => 'Existing User',
@@ -83,13 +93,14 @@ class RumahManagementTest extends TestCase
         ]);
 
         // Coba input rumah lagi dengan NIK yang sama
-        $response = $this->actingAs($this->surveyor)->post('/rumah', [
+        $response = $this->actingAs($this->admin)->post('/rumah', [
             'nama_kepala_keluarga'  => 'Duplicate User',
             'nik'                   => '1111222233334444',
             'no_kk'                 => '9999888877776666',
             'jumlah_anggota'        => 2,
             'alamat'                => 'Jl. Duplicate',
             'wilayah_id'            => $this->rt->id,
+            'surveyor_id'           => $this->surveyor->id,
             'action'                => 'save',
         ]);
 
@@ -130,18 +141,19 @@ class RumahManagementTest extends TestCase
 
     public function test_input_rumah_mencatat_audit_log(): void
     {
-        $this->actingAs($this->surveyor)->post('/rumah', [
+        $this->actingAs($this->admin)->post('/rumah', [
             'nama_kepala_keluarga'  => 'Audit Test',
             'nik'                   => '1234567890123456',
             'no_kk'                 => '6543210987654321',
             'jumlah_anggota'        => 4,
             'alamat'                => 'Jl. Audit',
             'wilayah_id'            => $this->rt->id,
+            'surveyor_id'           => $this->surveyor->id,
             'action'                => 'save',
         ]);
 
         $this->assertDatabaseHas('audit_log', [
-            'user_id'  => $this->surveyor->id,
+            'user_id'  => $this->admin->id,
             'aksi'     => 'RUMAH_CREATE',
             'entitas'  => 'rumah_warga',
         ]);
