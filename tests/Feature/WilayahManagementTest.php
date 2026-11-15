@@ -120,28 +120,19 @@ class WilayahManagementTest extends TestCase
         $this->assertSoftDeleted('wilayah', ['id' => $rt->id]);
     }
 
-    public function test_get_tree_mengembalikan_hierarki(): void
+    public function test_get_tree_hanya_mengembalikan_provinsi(): void
     {
-        [$kec, $kel, $rw, $rt] = $this->makeWilayahTree();
+        $this->makeWilayahTree(); // berakar di kecamatan, tidak boleh muncul di pohon
+
+        $prov = Wilayah::create(['kode' => 'PROV-1', 'nama' => 'Provinsi 1', 'tingkat' => 'provinsi', 'parent_id' => null]);
+        $prov->update(['path' => '/' . $prov->id]);
 
         $response = $this->actingAs($this->admin)->getJson('/wilayah/tree');
 
         $response->assertOk();
-
-        // Cek top-level array punya minimal 1 node (kecamatan)
-        $tree = $response->json();
-        $this->assertGreaterThanOrEqual(1, count($tree));
-
-        // Cek root node (kecamatan) punya key children
-        $rootNode = collect($tree)->first(fn ($node) => $node['kode'] === 'KEC-1');
-        $this->assertNotNull($rootNode);
-        $this->assertArrayHasKey('children', $rootNode);
-        $this->assertGreaterThanOrEqual(1, count($rootNode['children']));
-
-        // Cek kelurahan punya children (rw)
-        $kelNode = collect($rootNode['children'])->first(fn ($n) => $n['kode'] === 'KEL-1');
-        $this->assertNotNull($kelNode);
-        $this->assertArrayHasKey('children', $kelNode);
+        $kodeList = collect($response->json())->pluck('kode')->all();
+        $this->assertContains('PROV-1', $kodeList);
+        $this->assertNotContains('KEC-1', $kodeList);
     }
 
     public function test_get_descendants_mengembalikan_semua_anak_berjenjang(): void
