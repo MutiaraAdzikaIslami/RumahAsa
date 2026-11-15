@@ -5,6 +5,7 @@ namespace App\Modules\Users\Services;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Wilayah;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -33,13 +34,13 @@ class UserService
 
         $user = User::create([
             'role_id'              => $data['role_id'],
-            'wilayah_id'           => $data['wilayah_id'],
+            'wilayah_id'           => $data['wilayah_id'] ?? null,
             'nama'                 => $data['nama'],
             'username'             => $data['username'],
-            'email'                 => $data['email'] ?? null,
-            'password'              => Hash::make($passwordSementara),
-            'must_change_password'  => true,
-            'is_aktif'              => $data['is_aktif'] ?? true,
+            'email'                => $data['email'] ?? null,
+            'password'             => Hash::make($passwordSementara),
+            'must_change_password' => true,
+            'is_aktif'             => $data['is_aktif'] ?? true,
         ]);
 
         return ['user' => $user, 'password_sementara' => $passwordSementara];
@@ -50,19 +51,26 @@ class UserService
      */
     public function update(User $user, array $data): User
     {
-        $this->validateRoleWilayah(
-            $data['role_id'] ?? $user->role_id,
-            $data['wilayah_id'] ?? $user->wilayah_id,
-            $user
-        );
+        $targetRoleId = array_key_exists('role_id', $data) ? $data['role_id'] : $user->role_id;
+        $targetWilayahId = array_key_exists('wilayah_id', $data) ? $data['wilayah_id'] : $user->wilayah_id;
+
+        // Cegah admin mengubah role diri sendiri menjadi non-admin
+        if (auth()->id() === $user->id && $targetRoleId !== $user->role_id) {
+            $targetRole = Role::find($targetRoleId);
+            if ($user->isAdmin() && $targetRole && !$targetRole->isAdmin()) {
+                throw new \RuntimeException('Anda tidak dapat mengubah role akun sendiri menjadi non-admin.');
+            }
+        }
+
+        $this->validateRoleWilayah($targetRoleId, $targetWilayahId, $user);
 
         $updateData = [
-            'role_id'    => $data['role_id'] ?? $user->role_id,
-            'wilayah_id' => $data['wilayah_id'] ?? $user->wilayah_id,
-            'nama'       => $data['nama'] ?? $user->nama,
-            'username'   => $data['username'] ?? $user->username,
+            'role_id'    => $targetRoleId,
+            'wilayah_id' => $targetWilayahId,
+            'nama'       => array_key_exists('nama', $data) ? $data['nama'] : $user->nama,
+            'username'   => array_key_exists('username', $data) ? $data['username'] : $user->username,
             'email'      => array_key_exists('email', $data) ? $data['email'] : $user->email,
-            'is_aktif'   => $data['is_aktif'] ?? $user->is_aktif,
+            'is_aktif'   => array_key_exists('is_aktif', $data) ? $data['is_aktif'] : $user->is_aktif,
         ];
 
         // Hash password baru bila diisi
@@ -81,25 +89,28 @@ class UserService
      */
     public function toggleAktif(User $user): User
     {
-        // Cegah admin menonaktifkan diri sendiri
-        if (auth()->id() === $user->id) {
-            throw new \RuntimeException('Anda tidak dapat menonaktifkan akun sendiri.');
-        }
-
-        // Cegah menonaktifkan admin terakhir yang aktif
-        if ($user->isAdmin() && $user->is_aktif) {
-            $adminAktifCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
-                ->where('is_aktif', true)
-                ->whereNull('deleted_at')
-                ->count();
-            if ($adminAktifCount <= 1) {
-                throw new \RuntimeException('Tidak dapat menonaktifkan admin terakhir yang aktif.');
+        return DB::transaction(function () use ($user) {
+            // Cegah admin menonaktifkan diri sendiri
+            if (auth()->id() === $user->id) {
+                throw new \RuntimeException('Anda tidak dapat menonaktifkan akun sendiri.');
             }
-        }
 
-        $user->update(['is_aktif' => !$user->is_aktif]);
+            // Cegah menonaktifkan admin terakhir yang aktif
+            if ($user->isAdmin() && $user->is_aktif) {
+                $adminAktifCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
+                    ->where('is_aktif', true)
+                    ->whereNull('deleted_at')
+                    ->lockForUpdate()
+                    ->count();
+                if ($adminAktifCount <= 1) {
+                    throw new \RuntimeException('Tidak dapat menonaktifkan admin terakhir yang aktif.');
+                }
+            }
 
-        return $user->fresh();
+            $user->update(['is_aktif' => !$user->is_aktif]);
+
+            return $user->fresh();
+        });
     }
 
     /**
@@ -107,20 +118,24 @@ class UserService
      */
     public function delete(User $user): void
     {
-        if (auth()->id() === $user->id) {
-            throw new \RuntimeException('Anda tidak dapat menghapus akun sendiri.');
-        }
-
-        if ($user->isAdmin()) {
-            $adminCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
-                ->whereNull('deleted_at')
-                ->count();
-            if ($adminCount <= 1) {
-                throw new \RuntimeException('Tidak dapat menghapus admin terakhir.');
+        DB::transaction(function () use ($user) {
+            // Cegah admin menghapus diri sendiri
+            if (auth()->id() === $user->id) {
+                throw new \RuntimeException('Anda tidak dapat menghapus akun sendiri.');
             }
-        }
 
-        $user->delete();
+            if ($user->isAdmin()) {
+                $adminCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
+                    ->whereNull('deleted_at')
+                    ->lockForUpdate()
+                    ->count();
+                if ($adminCount <= 1) {
+                    throw new \RuntimeException('Tidak dapat menghapus admin terakhir.');
+                }
+            }
+
+            $user->delete();
+        });
     }
 
     /**
