@@ -10,14 +10,14 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * FR-05: Service untuk manage user oleh Admin.
+ * FR-05 & FR-06: Service untuk manage user, role, dan wilayah tugas oleh Admin.
  *
  * Aturan:
  *  - Create: generate password sementara acak (12 char), set must_change_password=true
  *  - Update: hash password baru bila diisi
  *  - Nonaktifkan: toggle is_aktif (tidak hapus)
  *  - Delete: soft delete, cek constraint (tidak boleh hapus admin terakhir)
- *  - Validasi: Surveyor wajib punya wilayah, role lain wilayah kosong
+ *  - Validasi: Surveyor wajib punya wilayah, role lain wilayah kosong (null)
  */
 class UserService
 {
@@ -28,22 +28,24 @@ class UserService
      */
     public function create(array $data): array
     {
-        $this->validateRoleWilayah($data['role_id'] ?? null, $data['wilayah_id'] ?? null);
+        return DB::transaction(function () use ($data) {
+            $this->validateRoleWilayah($data['role_id'] ?? null, $data['wilayah_id'] ?? null);
 
-        $passwordSementara = $this->generatePasswordSementara();
+            $passwordSementara = $this->generatePasswordSementara();
 
-        $user = User::create([
-            'role_id'              => $data['role_id'],
-            'wilayah_id'           => $data['wilayah_id'] ?? null,
-            'nama'                 => $data['nama'],
-            'username'             => $data['username'],
-            'email'                => $data['email'] ?? null,
-            'password'             => Hash::make($passwordSementara),
-            'must_change_password' => true,
-            'is_aktif'             => $data['is_aktif'] ?? true,
-        ]);
+            $user = User::create([
+                'role_id'              => $data['role_id'],
+                'wilayah_id'           => $data['wilayah_id'] ?? null,
+                'nama'                 => $data['nama'],
+                'username'             => $data['username'],
+                'email'                => $data['email'] ?? null,
+                'password'             => Hash::make($passwordSementara),
+                'must_change_password' => true,
+                'is_aktif'             => $data['is_aktif'] ?? true,
+            ]);
 
-        return ['user' => $user, 'password_sementara' => $passwordSementara];
+            return ['user' => $user, 'password_sementara' => $passwordSementara];
+        });
     }
 
     /**
@@ -51,37 +53,39 @@ class UserService
      */
     public function update(User $user, array $data): User
     {
-        $targetRoleId = array_key_exists('role_id', $data) ? $data['role_id'] : $user->role_id;
-        $targetWilayahId = array_key_exists('wilayah_id', $data) ? $data['wilayah_id'] : $user->wilayah_id;
+        return DB::transaction(function () use ($user, $data) {
+            $targetRoleId = array_key_exists('role_id', $data) ? $data['role_id'] : $user->role_id;
+            $targetWilayahId = array_key_exists('wilayah_id', $data) ? $data['wilayah_id'] : $user->wilayah_id;
 
-        // Cegah admin mengubah role diri sendiri menjadi non-admin
-        if (auth()->id() === $user->id && $targetRoleId !== $user->role_id) {
-            $targetRole = Role::find($targetRoleId);
-            if ($user->isAdmin() && $targetRole && !$targetRole->isAdmin()) {
-                throw new \RuntimeException('Anda tidak dapat mengubah role akun sendiri menjadi non-admin.');
+            // Cegah admin mengubah role diri sendiri menjadi non-admin
+            if (auth()->id() === $user->id && $targetRoleId !== $user->role_id) {
+                $targetRole = Role::find($targetRoleId);
+                if ($user->isAdmin() && $targetRole && !$targetRole->isAdmin()) {
+                    throw new \RuntimeException('Anda tidak dapat mengubah role akun sendiri menjadi non-admin.');
+                }
             }
-        }
 
-        $this->validateRoleWilayah($targetRoleId, $targetWilayahId, $user);
+            $this->validateRoleWilayah($targetRoleId, $targetWilayahId, $user);
 
-        $updateData = [
-            'role_id'    => $targetRoleId,
-            'wilayah_id' => $targetWilayahId,
-            'nama'       => array_key_exists('nama', $data) ? $data['nama'] : $user->nama,
-            'username'   => array_key_exists('username', $data) ? $data['username'] : $user->username,
-            'email'      => array_key_exists('email', $data) ? $data['email'] : $user->email,
-            'is_aktif'   => array_key_exists('is_aktif', $data) ? $data['is_aktif'] : $user->is_aktif,
-        ];
+            $updateData = [
+                'role_id'    => $targetRoleId,
+                'wilayah_id' => $targetWilayahId,
+                'nama'       => array_key_exists('nama', $data) ? $data['nama'] : $user->nama,
+                'username'   => array_key_exists('username', $data) ? $data['username'] : $user->username,
+                'email'      => array_key_exists('email', $data) ? $data['email'] : $user->email,
+                'is_aktif'   => array_key_exists('is_aktif', $data) ? $data['is_aktif'] : $user->is_aktif,
+            ];
 
-        // Hash password baru bila diisi
-        if (!empty($data['password'])) {
-            $updateData['password'] = Hash::make($data['password']);
-            $updateData['must_change_password'] = true;
-        }
+            // Hash password baru bila diisi
+            if (!empty($data['password'])) {
+                $updateData['password'] = Hash::make($data['password']);
+                $updateData['must_change_password'] = true;
+            }
 
-        $user->update($updateData);
+            $user->update($updateData);
 
-        return $user->fresh();
+            return $user->fresh();
+        });
     }
 
     /**
@@ -167,7 +171,7 @@ class UserService
     /**
      * Validasi: Surveyor wajib punya wilayah, role lain wilayah harus null.
      */
-    private function validateRoleWilayah(?int $roleId, ?int $wilayahId, ?User $exceptUser = null): void
+    public function validateRoleWilayah(?int $roleId, ?int $wilayahId, ?User $exceptUser = null): void
     {
         if (!$roleId) {
             throw new \InvalidArgumentException('Role wajib dipilih.');
