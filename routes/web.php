@@ -62,3 +62,10 @@ Route::get('/', function () {
 });
 
 Route::get('/up', fn () => response()->json(['status' => 'ok']));
+
+// scrum-32 s.d. 36: Bantuan dan renovasi (Verifikator, Admin, Pimpinan)
+Route::middleware(['auth', 'must.change.pwd', 'role:verifikator|admin|pimpinan'])
+    ->prefix('bantuan')->name('bantuan.')
+    ->group(function () {
+        require __DIR__ . '/../app/Modules/Bantuan/routes.php';
+    });

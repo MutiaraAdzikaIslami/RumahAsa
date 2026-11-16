@@ -99,6 +99,11 @@ class RumahWarga extends Model
         return substr($noKk, 0, 4) . str_repeat('*', 8) . substr($noKk, -4);
     }
 
+    public function penerimaBantuan(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(PenerimaBantuan::class, 'rumah_id');
+    }
+
     public function scopeStatus(Builder $q, string $status): Builder
     {
         return $q->where('status', $status);

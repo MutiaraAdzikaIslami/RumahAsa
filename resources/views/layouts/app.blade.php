@@ -79,6 +79,12 @@
                     Audit Log
                 </a>
                 @endcan
+                @canany(['verifikator', 'admin', 'pimpinan'])
+                <a href="{{ route('bantuan.index') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('bantuan.*') ? 'bg-forest-light' : '' }}">
+                    <i data-lucide="hammer" class="w-4 h-4"></i>
+                    Bantuan &amp; Renovasi
+                </a>
+                @endcanany
             </nav>
             <div class="p-4 border-t border-forest-light">
                 <form method="POST" action="{{ route('logout') }}">
