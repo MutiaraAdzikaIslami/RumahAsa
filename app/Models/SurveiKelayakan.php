@@ -11,13 +11,21 @@ class SurveiKelayakan extends Model
     protected $table = 'survei_kelayakan';
 
     protected $fillable = [
-        'rumah_id', 'surveyor_id',
-        'tanggal_survei', 'dikirim_at',
+        'rumah_id',
+        'surveyor_id',
+        'tanggal_survei',
+        'dikirim_at',
+        'latitude_survei',
+        'longitude_survei',
+        'lokasi_dicatat_at',
     ];
 
     protected $casts = [
-        'tanggal_survei' => 'date',
-        'dikirim_at'     => 'datetime',
+        'tanggal_survei'    => 'date',
+        'dikirim_at'        => 'datetime',
+        'lokasi_dicatat_at' => 'datetime',
+        'latitude_survei'   => 'decimal:7',
+        'longitude_survei'  => 'decimal:7',
     ];
 
     public function rumah(): BelongsTo
@@ -35,18 +43,10 @@ class SurveiKelayakan extends Model
         return $this->hasMany(SurveiKomponen::class, 'survei_id');
     }
 
-    /**
-     * Cek apakah survei sudah lengkap untuk diajukan (UC-05)
-     * - 7 komponen semua terisi opsi kondisi
-     * - Setiap komponen punya minimal 1 foto
-     */
     public function apakahLengkap(): bool
     {
         $komponen = $this->komponenSurvei()->withCount(['foto as foto_count'])->get();
-
-        // Harus ada 7 baris komponen, semua opsi_kondisi_id terisi, semua punya foto >= 1
         if ($komponen->count() !== 7) return false;
-
         foreach ($komponen as $k) {
             if ($k->opsi_kondisi_id === null) return false;
             if ($k->foto_count < 1) return false;

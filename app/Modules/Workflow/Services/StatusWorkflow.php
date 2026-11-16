@@ -12,30 +12,36 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Dev Story: StatusWorkflow adalah SATU-SATUNYA pintu perubahan status rumah.
+ * StatusWorkflow adalah SATU-SATUNYA pintu perubahan status rumah.
  *
  * Prinsip:
  *  - Setiap transisi status HANYA boleh lewat class ini
- *  - Setiap method memvalidasi transisi valid -> throw jika tidak
+ *  - Setiap method memvalidasi transisi valid → throw jika tidak
  *  - Wrap dalam DB::transaction()
  *  - Insert RiwayatStatus + AuditLog dalam transaksi yang sama
  *
  * Matriks transisi (status_dari => [status_ke_yg_diizinkan, ...]):
- *  Draf             -> Diajukan
- *  Diajukan         -> Perlu Perbaikan | Layak Huni | Penerima Bantuan
- *  Perlu Perbaikan  -> Diajukan
- *  Penerima Bantuan -> Dalam Renovasi
- *  Dalam Renovasi   -> Selesai
- *  Layak Huni       -> [] (final)
- *  Selesai          -> [] (final)
+ *  Menunggu Survei   → Diajukan
+ *  Diajukan          → Perlu Perbaikan | Layak Huni | Penerima Bantuan
+ *  Perlu Perbaikan   → Diajukan
+ *  Penerima Bantuan  → Dalam Renovasi
+ *  Dalam Renovasi    → Selesai
+ *  Layak Huni        → [] (final)
+ *  Selesai           → [] (final)
  */
 class StatusWorkflow
 {
     /**
      * Matriks transisi status yang diizinkan.
+     *
+     * Workflow baru:
+     *  - Admin input data rumah → 'Menunggu Survei' (default di DB)
+     *  - Surveyor isi survei kelayakan + submit → 'Diajukan'
+     *  - Verifikator review → 'Perlu Perbaikan' / 'Layak Huni' / 'Penerima Bantuan'
+     *  - 'Penerima Bantuan' → 'Dalam Renovasi' → 'Selesai'
      */
     private const TRANSITIONS = [
-        RumahWarga::STATUS_DRAF => [
+        RumahWarga::STATUS_MENUNGGU_SURVEI => [
             RumahWarga::STATUS_DIAJUKAN,
         ],
         RumahWarga::STATUS_DIAJUKAN => [
@@ -54,13 +60,12 @@ class StatusWorkflow
         ],
         // Final states — tidak ada transisi keluar
         RumahWarga::STATUS_LAYAK_HUNI => [],
-        RumahWarga::STATUS_SELESAI    => [],
+        RumahWarga::STATUS_SELESAI   => [],
     ];
 
     public function __construct(
         private readonly AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     /**
      * Cek apakah transisi dari $from ke $to diizinkan.
@@ -72,35 +77,35 @@ class StatusWorkflow
     }
 
     /**
-     * UC-05: Surveyor mengajukan survei (Draf/Perlu Perbaikan -> Diajukan).
+     * UC-05: Surveyor mengajukan survei (Menunggu Survei/Perlu Perbaikan → Diajukan).
      */
     public function ajukan(RumahWarga $rumah, ?User $user = null): void
     {
         $this->transition(
-            rumah:     $rumah,
-            to:        RumahWarga::STATUS_DIAJUKAN,
-            user:      $user,
-            catatan:   'Survei diajukan ke Verifikator',
+            rumah: $rumah,
+            to: RumahWarga::STATUS_DIAJUKAN,
+            user: $user,
+            catatan: 'Survei diajukan ke Verifikator',
             auditAksi: AuditLog::AKSI['SURVEI_SUBMIT'],
         );
     }
 
     /**
-     * Verifikator minta perbaikan survei (Diajukan -> Perlu Perbaikan).
+     * Verifikator minta perbaikan survei (Diajukan → Perlu Perbaikan).
      */
     public function mintaPerbaikan(RumahWarga $rumah, string $catatan, ?User $user = null): void
     {
         $this->transition(
-            rumah:     $rumah,
-            to:        RumahWarga::STATUS_PERLU_PERBAIKAN,
-            user:      $user,
-            catatan:   $catatan,
+            rumah: $rumah,
+            to: RumahWarga::STATUS_PERLU_PERBAIKAN,
+            user: $user,
+            catatan: $catatan,
             auditAksi: AuditLog::AKSI['STATUS_CHANGE'],
         );
     }
 
     /**
-     * UC-09: Verifikator menetapkan kategori manual (Diajukan -> Layak Huni / Penerima Bantuan).
+     * UC-09: Verifikator menetapkan kategori manual (Diajukan → Layak Huni / Penerima Bantuan).
      *
      * @param string $kategori 'layak_huni' atau 'tidak_layak_huni'
      */
@@ -111,17 +116,17 @@ class StatusWorkflow
             : RumahWarga::STATUS_LAYAK_HUNI;
 
         $this->transition(
-            rumah:     $rumah,
-            to:        $to,
-            user:      $user,
-            catatan:   $catatan,
+            rumah: $rumah,
+            to: $to,
+            user: $user,
+            catatan: $catatan,
             auditAksi: AuditLog::AKSI['STATUS_CHANGE'],
         );
     }
 
     /**
      * Verifikator merevisi keputusan sebelum renovasi dimulai.
-     * Toggle antara Layak Huni <-> Penerima Bantuan.
+     * Toggle antara Layak Huni ↔ Penerima Bantuan.
      */
     public function revisiKeputusan(RumahWarga $rumah, string $catatan, ?User $user = null): void
     {
@@ -130,39 +135,39 @@ class StatusWorkflow
             : RumahWarga::STATUS_LAYAK_HUNI;
 
         $this->transition(
-            rumah:     $rumah,
-            to:        $to,
-            user:      $user,
-            catatan:   $catatan,
+            rumah: $rumah,
+            to: $to,
+            user: $user,
+            catatan: $catatan,
             auditAksi: AuditLog::AKSI['STATUS_CHANGE'],
         );
     }
 
     /**
-     * UC-13: Verifikator mencatat penyaluran bantuan (Penerima Bantuan -> Dalam Renovasi).
+     * UC-13: Verifikator mencatat penyaluran bantuan (Penerima Bantuan → Dalam Renovasi).
      */
     public function mulaiRenovasi(RumahWarga $rumah, string $catatan, ?User $user = null): void
     {
         $this->transition(
-            rumah:     $rumah,
-            to:        RumahWarga::STATUS_DALAM_RENOVASI,
-            user:      $user,
-            catatan:   $catatan,
+            rumah: $rumah,
+            to: RumahWarga::STATUS_DALAM_RENOVASI,
+            user: $user,
+            catatan: $catatan,
             auditAksi: AuditLog::AKSI['STATUS_CHANGE'],
         );
     }
 
     /**
-     * Verifikator menetapkan status Selesai (Dalam Renovasi -> Selesai).
+     * Verifikator menetapkan status Selesai (Dalam Renovasi → Selesai).
      * Syarat: progres terakhir 100%. Pengecekan dilakukan di controller modul Renovasi.
      */
     public function selesaikan(RumahWarga $rumah, ?string $catatan = null, ?User $user = null): void
     {
         $this->transition(
-            rumah:     $rumah,
-            to:        RumahWarga::STATUS_SELESAI,
-            user:      $user,
-            catatan:   $catatan ?? 'Renovasi selesai (100%)',
+            rumah: $rumah,
+            to: RumahWarga::STATUS_SELESAI,
+            user: $user,
+            catatan: $catatan ?? 'Renovasi selesai (100%)',
             auditAksi: AuditLog::AKSI['STATUS_CHANGE'],
         );
     }
@@ -203,12 +208,12 @@ class StatusWorkflow
 
             // 3. Tulis audit log
             $this->auditLogger->catat(
-                aksi:      $auditAksi,
-                entitas:   'rumah_warga',
+                aksi: $auditAksi,
+                entitas: 'rumah_warga',
                 entitasId: $rumah->id,
-                dataBaru:  ['status' => $to, 'catatan' => $catatan],
-                dataLama:  ['status' => $from],
-                user:      $user,
+                dataBaru: ['status' => $to, 'catatan' => $catatan],
+                dataLama: ['status' => $from],
+                user: $user,
             );
         });
     }

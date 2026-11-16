@@ -26,7 +26,7 @@ class StatusWorkflowTest extends TestCase
         $this->workflow = app(StatusWorkflow::class);
     }
 
-    private function makeRumah(string $status = 'Draf'): RumahWarga
+    private function makeRumah(string $status = 'Menunggu Survei'): RumahWarga
     {
         $kec = Wilayah::create(['kode' => 'KEC-T', 'nama' => 'Kec Test', 'tingkat' => 'kecamatan', 'parent_id' => null]);
         $kec->update(['path' => '/' . $kec->id]);
@@ -61,7 +61,7 @@ class StatusWorkflowTest extends TestCase
 
     public function test_draf_bisa_diajukan(): void
     {
-        $rumah = $this->makeRumah('Draf');
+        $rumah = $this->makeRumah('Menunggu Survei');
         $surveyor = $this->makeUser('surveyor');
 
         $this->workflow->ajukan($rumah, $surveyor);
@@ -133,7 +133,7 @@ class StatusWorkflowTest extends TestCase
 
     public function test_setiap_transisi_mencatat_riwayat_status_dan_audit_log(): void
     {
-        $rumah = $this->makeRumah('Draf');
+        $rumah = $this->makeRumah('Menunggu Survei');
         $surveyor = $this->makeUser('surveyor');
 
         // Gunakan DB transaction spy untuk pastikan semua query jalan
@@ -144,7 +144,7 @@ class StatusWorkflowTest extends TestCase
         // Assert riwayat_status tercatat
         $this->assertDatabaseHas('riwayat_status', [
             'rumah_id'    => $rumah->id,
-            'status_dari' => 'Draf',
+            'status_dari' => 'Menunggu Survei',
             'status_ke'   => 'Diajukan',
             'user_id'     => $surveyor->id,
         ]);
@@ -165,12 +165,12 @@ class StatusWorkflowTest extends TestCase
 
     public function test_can_transition_check_method(): void
     {
-        $this->assertTrue($this->workflow->canTransition('Draf', 'Diajukan'));
+        $this->assertTrue($this->workflow->canTransition('Menunggu Survei', 'Diajukan'));
         $this->assertTrue($this->workflow->canTransition('Diajukan', 'Penerima Bantuan'));
         $this->assertTrue($this->workflow->canTransition('Penerima Bantuan', 'Dalam Renovasi'));
 
-        $this->assertFalse($this->workflow->canTransition('Draf', 'Selesai'));      // skip
-        $this->assertFalse($this->workflow->canTransition('Layak Huni', 'Draf'));   // final
-        $this->assertFalse($this->workflow->canTransition('Selesai', 'Draf'));      // final
+        $this->assertFalse($this->workflow->canTransition('Menunggu Survei', 'Selesai'));      // skip
+        $this->assertFalse($this->workflow->canTransition('Layak Huni', 'Menunggu Survei'));   // final
+        $this->assertFalse($this->workflow->canTransition('Selesai', 'Menunggu Survei'));      // final
     }
 }

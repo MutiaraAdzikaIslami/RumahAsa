@@ -3,62 +3,79 @@
 use App\Modules\Auth\Http\Controllers\LoginController;
 use App\Modules\Auth\Http\Controllers\PasswordController;
 use App\Modules\Auth\Http\Controllers\SessionController;
+use App\Modules\Rumah\Http\Controllers\RumahController;
+use App\Modules\Survei\Http\Controllers\SurveiController;
+use App\Modules\Users\Http\Controllers\RoleController;
+use App\Modules\Users\Http\Controllers\UserController;
+use App\Modules\Users\Http\Controllers\UserFormDataController;
 use App\Modules\Wilayah\Http\Controllers\WilayahController;
 use Illuminate\Support\Facades\Route;
 
-// FR-01: Login routes (public)
-Route::get('/login',  [LoginController::class, 'showLoginForm'])->name('login');
-Route::post('/login', [LoginController::class, 'login']);
+// 1. GUEST ROUTES
+Route::middleware('guest')->group(function () {
+    Route::get('/login',  [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
+});
 
-// FR-02: Logout & session ping
-Route::post('/logout',       [SessionController::class, 'logout'])->middleware('auth')->name('logout');
-Route::post('/session/ping', [SessionController::class, 'ping'])->middleware('auth')->name('session.ping');
-
-// FR-03: Ganti password
+// 2. AUTHENTICATED ROUTES
 Route::middleware('auth')->group(function () {
+
+    Route::post('/logout', [SessionController::class, 'logout'])->name('logout');
+
+    Route::match(['get', 'post'], '/session/ping', function () {
+        return response()->json(['ok' => true, 'ts' => now()->toIso8601String()]);
+    })->name('session.ping');
+
     Route::get('/password/change', [PasswordController::class, 'edit'])->name('password.change');
-    Route::put('/password',         [PasswordController::class, 'update'])->name('password.update');
+    Route::put('/password',        [PasswordController::class, 'update'])->name('password.update');
+
+    // 3. ROUTES YANG BUTUH PASSWORD SUDAH DIGANTI
+    Route::middleware('must.change.pwd')->group(function () {
+
+        Route::get('/dashboard', function () {
+            return view('dashboard.placeholder');
+        })->name('dashboard')->middleware('can:view-dashboard');
+
+        Route::get('/', function () {
+            return redirect()->route('dashboard');
+        })->name('home');
+
+        // 4. ADMIN ROUTES
+        Route::middleware('role:manage-users')->group(function () {
+
+            // FR-05 & FR-06: User Management & Hydrate Endpoints
+            Route::get('users/form-data', [UserFormDataController::class, 'index'])->name('users.form-data');
+            Route::get('users/roles',     [RoleController::class, 'index'])->name('users.roles');
+            Route::resource('users', UserController::class)->except(['show']);
+            Route::match(['put', 'post'], 'users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+            Route::match(['put', 'patch'], 'users/{user}/toggle-aktif',   [UserController::class, 'toggleAktif'])->name('users.toggle-aktif');
+            Route::post('users/restore',                                  [UserController::class, 'restore'])->name('users.restore');
+            Route::post('users/{userId}/restore',                         [UserController::class, 'restore'])->name('users.restore.id');
+
+            // FR-08: Wilayah Management
+            Route::prefix('wilayah')->name('wilayah.')->group(
+                base_path('app/Modules/Wilayah/routes.php')
+            );
+
+            // FR-09: Audit Log
+            Route::prefix('audit-log')->name('audit-log.')->group(
+                base_path('app/Modules/Audit/routes.php')
+            );
+
+            // API endpoints untuk cascading dropdown wilayah
+            Route::get('api/wilayah/kabupaten',                          [WilayahController::class, 'getKabupaten'])->name('api.wilayah.kabupaten');
+            Route::get('api/wilayah/kabupaten/{kabupatenId}/kecamatan', [WilayahController::class, 'getKecamatan'])->name('api.wilayah.kecamatan');
+            Route::get('api/wilayah/kecamatan/{kecamatanId}/kelurahan', [WilayahController::class, 'getKelurahan'])->name('api.wilayah.kelurahan');
+
+            // FR-07: Rumah Management
+            Route::resource('rumah', RumahController::class);
+        });
+
+        // 5. SURVEYOR ROUTES
+        Route::middleware('role:access-surveyor')->name('survei.')->group(function () {
+            Route::get('survei',                 [SurveiController::class, 'index'])->name('index');
+            Route::get('survei/{rumah}/create',  [SurveiController::class, 'create'])->name('create');
+            Route::post('survei/{rumah}',        [SurveiController::class, 'store'])->name('store');
+        });
+    });
 });
-
-// Dashboard + modul-modul (protected oleh must.change.pwd)
-Route::middleware(['auth', 'must.change.pwd'])->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard.placeholder', ['user' => auth()->user()]);
-    })->name('dashboard');
-
-    // scrum-17: Kelola Wilayah (FR-08) — admin only
-    Route::middleware('role:manage-wilayah')->prefix('wilayah')->name('wilayah.')->group(function () {
-        // FIX: Arahkan ke WilayahController@index supaya pagination & filter jalan
-        Route::get('/view', [WilayahController::class, 'index'])->name('view');
-        require __DIR__ . '/../app/Modules/Wilayah/routes.php';
-    });
-
-    // scrum-14: Kelola User (FR-05) — admin only
-    Route::middleware('role:manage-users')->prefix('users')->name('users.')->group(function () {
-        Route::get('/view', fn () => view('users.index'))->name('view');
-        require __DIR__ . '/../app/Modules/Users/routes.php';
-    });
-
-    // scrum-18: Audit Log (FR-09) — admin only
-    Route::middleware('role:view-audit-log')->prefix('audit')->name('audit.')->group(function () {
-        Route::get('/view', fn () => view('audit.index'))->name('view');
-        require __DIR__ . '/../app/Modules/Audit/routes.php';
-    });
-
-    // scrum-19: Rumah (FR-10, 12, 14)
-    Route::prefix('rumah')->name('rumah.')->group(function () {
-        require __DIR__ . '/../app/Modules/Rumah/routes.php';
-    });
-
-    // scrum-20/21: Survei & Foto (FR-11a, FR-11b)
-    Route::prefix('survei')->name('survei.')->group(function () {
-        require __DIR__ . '/../app/Modules/Survei/routes.php';
-    });
-});
-
-// Root redirect
-Route::get('/', function () {
-    return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
-});
-
-Route::get('/up', fn () => response()->json(['status' => 'ok']));

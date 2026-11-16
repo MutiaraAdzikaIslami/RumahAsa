@@ -1,157 +1,247 @@
 @extends('layouts.app')
 
-@section('title', 'Detail Rumah')
+@section('title_suffix', ' - Detail Rumah')
+@section('header', 'Detail Rumah')
 
 @section('content')
-<div class="space-y-4 max-w-4xl">
-    <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-slate-900">Detail Rumah</h1>
-        <div class="space-x-2">
-            @if ($rumah->bisaDiedit())
-                <a href="{{ route('rumah.edit', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Edit Rumah</a>
-            @endif
-            <a href="{{ route('rumah.index') }}" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg">Kembali</a>
-        </div>
-    </div>
+    <div class="space-y-6">
+        @include('partials.flash')
 
-    @if (session('success'))
-        <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">{{ session('success') }}</div>
-    @endif
-
-    <div class="bg-white rounded-lg shadow p-4">
-        @php
-            $badgeColors = [
-                'Draf' => 'bg-slate-100 text-slate-700',
-                'Diajukan' => 'bg-blue-100 text-blue-700',
-                'Perlu Perbaikan' => 'bg-amber-100 text-amber-700',
-                'Layak Huni' => 'bg-emerald-100 text-emerald-700',
-                'Penerima Bantuan' => 'bg-red-100 text-red-700',
-                'Dalam Renovasi' => 'bg-purple-100 text-purple-700',
-                'Selesai' => 'bg-teal-100 text-teal-700',
-            ];
-            $color = $badgeColors[$rumah->status] ?? 'bg-slate-100 text-slate-700';
-        @endphp
-        <div class="flex items-center gap-4">
-            <span class="font-mono text-sm text-slate-500">{{ $rumah->kode_registrasi }}</span>
-            <span class="px-3 py-1 rounded-full text-xs font-medium {{ $color }}">{{ $rumah->status }}</span>
-        </div>
-    </div>
-
-    {{-- Data Warga --}}
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Data Warga</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-                <p class="text-slate-500 text-xs">Nama Kepala Keluarga</p>
-                <p class="font-medium">{{ $rumah->nama_kepala_keluarga ?? '-' }}</p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">NIK</p>
-                <p class="font-mono">
-                    @if ($rumah->nik_enc)
-                        @can('view-audit-log')
-                            {{ app(\App\Modules\Core\Services\NikEncryptor::class)->decryptNik($rumah->nik_enc) }}
-                        @else
-                            {{ app(\App\Modules\Core\Services\NikEncryptor::class)->tersamar($rumah->nik_enc) }}
-                        @endcan
-                    @else
-                        -
+        <div class="rounded-2xl border border-forest-100 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="grid h-14 w-14 place-items-center rounded-xl bg-forest-700 text-cream-50">
+                        <i
+                            data-lucide="home"
+                            class="h-7 w-7"
+                        ></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <h2 class="text-xl font-bold text-forest-900">{{ $rumah->kode_registrasi }}
+                            </h2>
+                            <span
+                                class="inline-flex items-center rounded-full px-3 py-0.5 text-xs font-semibold {{ $rumah->badgeColorClass() }}"
+                            >
+                                {{ $rumah->status }}
+                            </span>
+                        </div>
+                        <p class="mt-1 text-sm text-forest-600">{{ $rumah->nama_kepala_keluarga }}
+                            &middot; {{ $rumah->wilayah?->nama ?? '-' }}</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    @if ($rumah->bisaDieditOlehAdmin())
+                        <a
+                            href="{{ route('rumah.edit', $rumah) }}"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-forest-100 bg-white px-4 py-2 text-sm font-medium text-forest-700 hover:bg-forest-50"
+                        >
+                            <i
+                                data-lucide="pencil"
+                                class="h-4 w-4"
+                            ></i> Edit
+                        </a>
+                        <form
+                            method="POST"
+                            action="{{ route('rumah.destroy', $rumah) }}"
+                            onsubmit="return confirm('Hapus data rumah ini?')"
+                            class="inline"
+                        >
+                            @csrf @method('DELETE')
+                            <button
+                                type="submit"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                            >
+                                <i
+                                    data-lucide="trash-2"
+                                    class="h-4 w-4"
+                                ></i> Hapus
+                            </button>
+                        </form>
                     @endif
-                </p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">No. Kartu Keluarga</p>
-                <p class="font-mono">
-                    @if ($rumah->no_kk_enc)
-                        @can('view-audit-log')
-                            {{ app(\App\Modules\Core\Services\NikEncryptor::class)->decryptNoKk($rumah->no_kk_enc) }}
-                        @else
-                            {{ substr(app(\App\Modules\Core\Services\NikEncryptor::class)->decryptNoKk($rumah->no_kk_enc), 0, 4) . '********' . substr(app(\App\Modules\Core\Services\NikEncryptor::class)->decryptNoKk($rumah->no_kk_enc), -4) }}
-                        @endcan
-                    @else
-                        -
-                    @endif
-                </p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">Jumlah Anggota</p>
-                <p>{{ $rumah->jumlah_anggota ?? '-' }} orang</p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">Pekerjaan</p>
-                <p>{{ $rumah->pekerjaan ?? '-' }}</p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">Penghasilan</p>
-                <p>{{ $rumah->penghasilan ? 'Rp ' . number_format($rumah->penghasilan) : '-' }}</p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">Status Kepemilikan</p>
-                <p>{{ str_replace('_', ' ', ucfirst($rumah->status_kepemilikan)) }}</p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">Luas Rumah</p>
-                <p>{{ $rumah->luas_rumah ? $rumah->luas_rumah . ' m²' : '-' }}</p>
+                </div>
             </div>
         </div>
-    </div>
 
-    {{-- Data Lokasi --}}
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Lokasi</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-                <p class="text-slate-500 text-xs">Wilayah</p>
-                <p class="font-medium">{{ $rumah->wilayah?->nama ?? '-' }}</p>
+        <div class="grid gap-6 lg:grid-cols-2">
+            <div class="rounded-2xl border border-forest-100 bg-white p-6 shadow-sm">
+                <div class="mb-4 flex items-center gap-2">
+                    <div class="grid h-8 w-8 place-items-center rounded-lg bg-forest-50">
+                        <i
+                            data-lucide="users"
+                            class="h-4 w-4 text-forest-600"
+                        ></i>
+                    </div>
+                    <h3 class="font-bold text-forest-900">Data Warga</h3>
+                </div>
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-forest-500">Nama Kepala Keluarga</dt>
+                        <dd class="font-medium text-forest-900">{{ $rumah->nama_kepala_keluarga }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 border-t border-forest-50 pt-3">
+                        <dt class="text-forest-500">NIK (tersamar)</dt>
+                        <dd class="font-mono text-forest-900">{{ $rumah->nikTersamar() }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 border-t border-forest-50 pt-3">
+                        <dt class="text-forest-500">No. Kartu Keluarga (tersamar)</dt>
+                        <dd class="font-mono text-forest-900">{{ $rumah->noKkTersamar() }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 border-t border-forest-50 pt-3">
+                        <dt class="text-forest-500">Jumlah Anggota</dt>
+                        <dd class="font-medium text-forest-900">{{ $rumah->jumlah_anggota }} orang</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 border-t border-forest-50 pt-3">
+                        <dt class="text-forest-500">Pekerjaan</dt>
+                        <dd class="font-medium text-forest-900">{{ $rumah->pekerjaan ?? '-' }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 border-t border-forest-50 pt-3">
+                        <dt class="text-forest-500">Penghasilan</dt>
+                        <dd class="font-medium text-forest-900">Rp
+                            {{ number_format((float) $rumah->penghasilan, 0, ',', '.') }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 border-t border-forest-50 pt-3">
+                        <dt class="text-forest-500">Status Kepemilikan</dt>
+                        <dd class="font-medium text-forest-900">
+                            {{ ucfirst(str_replace('_', ' ', $rumah->status_kepemilikan)) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 border-t border-forest-50 pt-3">
+                        <dt class="text-forest-500">Luas Rumah</dt>
+                        <dd class="font-medium text-forest-900">
+                            {{ $rumah->luas_rumah ? $rumah->luas_rumah . ' m²' : '-' }}</dd>
+                    </div>
+                </dl>
             </div>
-            <div>
-                <p class="text-slate-500 text-xs">Alamat</p>
-                <p>{{ $rumah->alamat ?? '-' }}</p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">Latitude</p>
-                <p class="font-mono">{{ $rumah->latitude ?? '-' }}</p>
-            </div>
-            <div>
-                <p class="text-slate-500 text-xs">Longitude</p>
-                <p class="font-mono">{{ $rumah->longitude ?? '-' }}</p>
-            </div>
-        </div>
-    </div>
 
-    {{-- Info Survei --}}
-    <div class="bg-white rounded-lg shadow p-6">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-slate-900">Survei Kelayakan</h2>
-            @if ($rumah->bisaDiedit())
-                <a href="{{ route('survei.create', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Isi Survei</a>
-            @endif
+            <div class="space-y-6">
+                <div class="rounded-2xl border border-forest-100 bg-white p-6 shadow-sm">
+                    <div class="mb-4 flex items-center gap-2">
+                        <div class="grid h-8 w-8 place-items-center rounded-lg bg-forest-50">
+                            <i
+                                data-lucide="map-pin"
+                                class="h-4 w-4 text-forest-600"
+                            ></i>
+                        </div>
+                        <h3 class="font-bold text-forest-900">Lokasi</h3>
+                    </div>
+                    <dl class="space-y-3 text-sm">
+                        <div>
+                            <dt class="text-forest-500">Alamat</dt>
+                            <dd class="mt-0.5 font-medium text-forest-900">{{ $rumah->alamat }}</dd>
+                        </div>
+                        <div class="border-t border-forest-50 pt-3">
+                            <dt class="text-forest-500">RT / RW</dt>
+                            <dd class="mt-0.5 font-medium text-forest-900">
+                                {{ $rumah->wilayah?->nama ?? '-' }} /
+                                {{ $rumah->wilayah?->parent?->nama ?? '-' }}</dd>
+                        </div>
+                        <div class="border-t border-forest-50 pt-3">
+                            <dt class="text-forest-500">Kelurahan/Desa</dt>
+                            <dd class="mt-0.5 font-medium text-forest-900">
+                                {{ $rumah->wilayah?->parent?->parent?->nama ?? '-' }}</dd>
+                        </div>
+                        <div class="border-t border-forest-50 pt-3">
+                            <dt class="text-forest-500">Koordinat GPS</dt>
+                            <dd class="mt-0.5 font-mono text-forest-900">{{ $rumah->latitude ?? '-' }},
+                                {{ $rumah->longitude ?? '-' }}</dd>
+                        </div>
+                    </dl>
+                </div>
+
+                <div class="rounded-2xl border border-forest-100 bg-white p-6 shadow-sm">
+                    <div class="mb-4 flex items-center gap-2">
+                        <div class="grid h-8 w-8 place-items-center rounded-lg bg-forest-50">
+                            <i
+                                data-lucide="user-check"
+                                class="h-4 w-4 text-forest-600"
+                            ></i>
+                        </div>
+                        <h3 class="font-bold text-forest-900">Penugasan Surveyor</h3>
+                    </div>
+                    <dl class="space-y-3 text-sm">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="grid h-10 w-10 place-items-center rounded-lg bg-forest-700 text-xs font-bold text-cream-50">
+                                {{ strtoupper(substr($rumah->surveyor?->nama ?? '??', 0, 2)) }}
+                            </div>
+                            <div>
+                                <p class="font-semibold text-forest-900">
+                                    {{ $rumah->surveyor?->nama ?? '-' }}</p>
+                                <p class="text-xs text-forest-500">{{ $rumah->surveyor?->username ?? '-' }}</p>
+                            </div>
+                        </div>
+                        <div class="border-t border-forest-50 pt-3">
+                            <dt class="text-forest-500">Tanggal Input</dt>
+                            <dd class="mt-0.5 font-medium text-forest-900">
+                                {{ $rumah->created_at?->format('d M Y, H.i') }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
         </div>
-        @if ($rumah->survei->isEmpty())
-            <p class="text-slate-500 text-sm">Belum ada survei.</p>
-        @else
-            <p class="text-sm text-slate-600">Survei sudah dibuat. Klik "Isi Survei" untuk melanjutkan pengisian.</p>
+
+        @if ($rumah->status === \App\Models\RumahWarga::STATUS_MENUNGGU_SURVEI)
+            <div class="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
+                <div class="flex items-start gap-3">
+                    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-100">
+                        <i
+                            data-lucide="alert-triangle"
+                            class="h-5 w-5 text-amber-600"
+                        ></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-amber-900">Menunggu Survei</h3>
+                        <p class="mt-1 text-sm text-amber-800">
+                            Data rumah ini sudah lengkap dan ditugaskan ke surveyor
+                            <strong>{{ $rumah->surveyor?->nama ?? '-' }}</strong>.
+                            Surveyor akan melihat rumah ini di halaman <em>Daftar Tugas Survei</em> dan
+                            melakukan Survei Kelayakan.
+                            Admin tidak perlu melanjutkan ke form Survei Kelayakan.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        @if ($rumah->riwayatStatus->isNotEmpty())
+            <div class="rounded-2xl border border-forest-100 bg-white p-6 shadow-sm">
+                <div class="mb-4 flex items-center gap-2">
+                    <div class="grid h-8 w-8 place-items-center rounded-lg bg-forest-50">
+                        <i
+                            data-lucide="history"
+                            class="h-4 w-4 text-forest-600"
+                        ></i>
+                    </div>
+                    <h3 class="font-bold text-forest-900">Riwayat Status</h3>
+                </div>
+                <ol class="space-y-3 text-sm">
+                    @foreach ($rumah->riwayatStatus->sortByDesc('created_at') as $riw)
+                        <li class="flex items-start gap-3 rounded-lg border border-forest-50 p-3">
+                            <div
+                                class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-forest-50">
+                                <i
+                                    data-lucide="arrow-right"
+                                    class="h-4 w-4 text-forest-600"
+                                ></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-forest-900">
+                                    {{ $riw->status_dari }} &rarr; {{ $riw->status_ke }}
+                                </p>
+                                <p class="text-xs text-forest-500">
+                                    {{ $riw->created_at?->format('d M Y, H.i') }} &middot;
+                                    oleh {{ $riw->user?->nama ?? 'System' }}
+                                </p>
+                                @if ($riw->catatan)
+                                    <p class="mt-1 text-xs italic text-forest-600">
+                                        "{{ $riw->catatan }}"</p>
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ol>
+            </div>
         @endif
     </div>
-
-    {{-- Riwayat Status --}}
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">Riwayat Status</h2>
-        @if ($rumah->riwayatStatus->isEmpty())
-            <p class="text-slate-500 text-sm">Belum ada riwayat perubahan status.</p>
-        @else
-            <ul class="space-y-2">
-                @foreach ($rumah->riwayatStatus as $riwayat)
-                    <li class="flex items-start gap-3 text-sm">
-                        <span class="text-slate-400 text-xs font-mono whitespace-nowrap">{{ $riwayat->created_at->format('d/m/Y H:i') }}</span>
-                        <span class="text-slate-600">{{ $riwayat->status_dari }} → <strong>{{ $riwayat->status_ke }}</strong></span>
-                        @if ($riwayat->catatan)
-                            <span class="text-slate-400 text-xs">({{ $riwayat->catatan }})</span>
-                        @endif
-                    </li>
-                @endforeach
-            </ul>
-        @endif
-    </div>
-</div>
 @endsection

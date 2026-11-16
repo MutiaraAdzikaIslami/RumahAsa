@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property string $status
+ * @property string $kode_registrasi
+ * @property Wilayah $wilayah
+ */
 class RumahWarga extends Model
 {
     use HasFactory, SoftDeletes;
@@ -18,14 +23,20 @@ class RumahWarga extends Model
     protected $fillable = [
         'kode_registrasi',
         'nama_kepala_keluarga',
-        'nik_enc', 'nik_hash',
-        'no_kk_enc', 'no_kk_hash',
+        'nik_enc',
+        'nik_hash',
+        'no_kk_enc',
+        'no_kk_hash',
         'jumlah_anggota',
         'luas_rumah',
-        'pekerjaan', 'penghasilan', 'status_kepemilikan',
+        'pekerjaan',
+        'penghasilan',
+        'status_kepemilikan',
         'alamat',
-        'latitude', 'longitude',
-        'wilayah_id', 'surveyor_id',
+        'latitude',
+        'longitude',
+        'wilayah_id',
+        'surveyor_id',
         'status',
     ];
 
@@ -37,7 +48,9 @@ class RumahWarga extends Model
         'jumlah_anggota' => 'integer',
     ];
 
-    public const STATUS_DRAF              = 'Draf';
+    // Status constants (FR-10 + StatusWorkflow)
+    public const STATUS_DRAF            = 'Menunggu Survei';
+    public const STATUS_MENUNGGU_SURVEI   = 'Menunggu Survei';
     public const STATUS_DIAJUKAN          = 'Diajukan';
     public const STATUS_PERLU_PERBAIKAN   = 'Perlu Perbaikan';
     public const STATUS_LAYAK_HUNI        = 'Layak Huni';
@@ -46,13 +59,23 @@ class RumahWarga extends Model
     public const STATUS_SELESAI           = 'Selesai';
 
     public const STATUS_LIST = [
-        self::STATUS_DRAF,
+        self::STATUS_MENUNGGU_SURVEI,
         self::STATUS_DIAJUKAN,
         self::STATUS_PERLU_PERBAIKAN,
         self::STATUS_LAYAK_HUNI,
         self::STATUS_PENERIMA_BANTUAN,
         self::STATUS_DALAM_RENOVASI,
         self::STATUS_SELESAI,
+    ];
+
+    public const STATUS_BADGE_COLOR = [
+        self::STATUS_MENUNGGU_SURVEI  => 'bg-amber-100 text-amber-800',
+        self::STATUS_DIAJUKAN         => 'bg-blue-100 text-blue-800',
+        self::STATUS_PERLU_PERBAIKAN  => 'bg-orange-100 text-orange-800',
+        self::STATUS_LAYAK_HUNI       => 'bg-forest-100 text-forest-800',
+        self::STATUS_PENERIMA_BANTUAN => 'bg-clay-400/20 text-clay-600',
+        self::STATUS_DALAM_RENOVASI   => 'bg-purple-100 text-purple-800',
+        self::STATUS_SELESAI          => 'bg-forest-700 text-cream-50',
     ];
 
     public function wilayah(): BelongsTo
@@ -80,9 +103,32 @@ class RumahWarga extends Model
         return $this->hasMany(RiwayatStatus::class, 'rumah_id');
     }
 
+    public function siapDisurvei(): bool
+    {
+        return $this->status === self::STATUS_MENUNGGU_SURVEI;
+    }
+
+    public function bisaDieditOlehAdmin(): bool
+    {
+        return $this->status === self::STATUS_MENUNGGU_SURVEI;
+    }
+
     public function bisaDiedit(): bool
     {
-        return in_array($this->status, [self::STATUS_DRAF, self::STATUS_PERLU_PERBAIKAN]);
+        return $this->bisaDieditSurvei();
+    }
+
+    public function bisaDieditSurvei(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_MENUNGGU_SURVEI,
+            self::STATUS_PERLU_PERBAIKAN,
+        ]);
+    }
+
+    public function badgeColorClass(): string
+    {
+        return self::STATUS_BADGE_COLOR[$this->status] ?? 'bg-forest-100 text-forest-800';
     }
 
     public function nikTersamar(): string

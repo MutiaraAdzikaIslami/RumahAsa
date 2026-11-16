@@ -4,92 +4,181 @@ namespace App\Modules\Survei\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\KomponenPenilaian;
+use App\Models\OpsiKondisi;
 use App\Models\RumahWarga;
+use App\Models\SurveiFoto;
 use App\Models\SurveiKelayakan;
 use App\Models\SurveiKomponen;
 use App\Modules\Core\Services\AuditLogger;
+use App\Modules\Core\Services\FotoStorageService;
+use App\Modules\Survei\Http\Requests\StoreSurveiRequest;
 use App\Modules\Workflow\Services\StatusWorkflow;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class SurveiController extends Controller
 {
     public function __construct(
-        private readonly AuditLogger $auditLogger,
         private readonly StatusWorkflow $workflow,
-    ) {
-    }
+        private readonly AuditLogger $auditLogger,
+        private readonly FotoStorageService $fotoStorage,
+    ) {}
 
-    public function create(RumahWarga $rumah)
+    public function index(Request $request): View
     {
-        $komponenList = KomponenPenilaian::with('opsiKondisi')->orderBy('urutan')->get();
+        $user = $request->user();
 
-        $survei = $rumah->survei()->first();
-        if (!$survei) {
-            $survei = SurveiKelayakan::create([
-                'rumah_id'      => $rumah->id,
-                'surveyor_id'    => auth()->id(),
-                'tanggal_survei' => now(),
+        $query = RumahWarga::with(['wilayah.parent.parent', 'surveyor'])
+            ->where('surveyor_id', $user->id);
+
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        } else {
+            $query->whereIn('status', [
+                RumahWarga::STATUS_MENUNGGU_SURVEI,
+                RumahWarga::STATUS_PERLU_PERBAIKAN,
             ]);
-            foreach ($komponenList as $k) {
-                SurveiKomponen::create([
-                    'survei_id'   => $survei->id,
-                    'komponen_id' => $k->id,
-                ]);
-            }
         }
 
-        $survei->load(['komponenSurvei.komponen.opsiKondisi', 'komponenSurvei.opsiKondisi', 'komponenSurvei.foto']);
+        if ($search = $request->input('q')) {
+            $searchLower = strtolower($search);
+            $query->where(function ($q) use ($searchLower) {
+                $q->whereRaw('LOWER(nama_kepala_keluarga) LIKE ?', ["%{$searchLower}%"])
+                    ->orWhereRaw('LOWER(kode_registrasi) LIKE ?', ["%{$searchLower}%"])
+                    ->orWhereRaw('LOWER(alamat) LIKE ?', ["%{$searchLower}%"]);
+            });
+        }
 
-        return view('survei.create', compact('rumah', 'survei', 'komponenList'));
+        $rumah = $query->orderByDesc('id')->paginate(15)->withQueryString();
+
+        $statusList = [
+            RumahWarga::STATUS_MENUNGGU_SURVEI => 'Menunggu Survei',
+            RumahWarga::STATUS_PERLU_PERBAIKAN => 'Perlu Perbaikan',
+            RumahWarga::STATUS_DIAJUKAN => 'Diajukan',
+        ];
+
+        return view('survei.index', compact('rumah', 'statusList'));
     }
 
-    public function update(Request $request, RumahWarga $rumah, SurveiKelayakan $survei)
+    public function create(RumahWarga $rumah): View|RedirectResponse
     {
-        $isDraft = $request->input('action') === 'draft';
+        $user = Auth::user();
 
-        $rules = [];
-        foreach ($request->input('komponen', []) as $komponenId => $data) {
-            $rules["komponen.{$komponenId}.opsi_kondisi_id"] = 'nullable|exists:opsi_kondisi,id';
-            $rules["komponen.{$komponenId}.catatan"] = 'nullable|string';
-        }
-        $validated = $request->validate($rules);
-
-        // FIX: Pakai $request->input('komponen', []) bukan $validated['komponen']
-        $komponenData = $request->input('komponen', []);
-        foreach ($komponenData as $komponenId => $data) {
-            SurveiKomponen::where('survei_id', $survei->id)
-                ->where('komponen_id', $komponenId)
-                ->update([
-                    'opsi_kondisi_id' => $data['opsi_kondisi_id'] ?? null,
-                    'catatan'          => $data['catatan'] ?? null,
-                ]);
+        if ($rumah->surveyor_id !== $user->id) {
+            return redirect()->route('survei.index')
+                ->with('error', 'Anda tidak ditugaskan untuk rumah ini.');
         }
 
-        if (!$isDraft) {
-            $survei->refresh();
-            if (!$survei->apakahLengkap()) {
-                return back()->withErrors(['msg' => 'Survei belum lengkap. Pastikan 7 komponen sudah dinilai dan ada minimal 1 foto per komponen.'])->withInput();
-            }
+        if (!$rumah->bisaDieditSurvei()) {
+            return redirect()->route('survei.index')
+                ->with('error', "Rumah ini tidak bisa disurvei (status: {$rumah->status}).");
+        }
 
-            $survei->update(['dikirim_at' => now()]);
-            $this->workflow->ajukan($rumah);
+        $komponenList = KomponenPenilaian::with('opsiKondisi')
+            ->orderBy('urutan')
+            ->get();
 
-            $this->auditLogger->catat(
-                aksi:      AuditLog::AKSI['SURVEI_SUBMIT'],
-                entitas:   'survei_kelayakan',
-                entitasId: $survei->id,
+        $opsiList = OpsiKondisi::orderBy('urutan', 'asc')->get();
+
+        return view('survei.create', compact('rumah', 'komponenList', 'opsiList'));
+    }
+
+    public function store(StoreSurveiRequest $request, RumahWarga $rumah): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if ($rumah->surveyor_id !== $user->id) {
+            return redirect()->route('survei.index')
+                ->with('error', 'Anda tidak ditugaskan untuk rumah ini.');
+        }
+
+        if (!$rumah->bisaDieditSurvei()) {
+            return redirect()->route('survei.index')
+                ->with('error', "Rumah ini tidak bisa disurvei (status: {$rumah->status}).");
+        }
+
+        $validated = $request->validated();
+
+        DB::transaction(function () use ($rumah, $validated, $user) {
+            // 1. Upsert header survei
+            $survei = SurveiKelayakan::updateOrCreate(
+                ['rumah_id' => $rumah->id],
+                [
+                    'surveyor_id'        => $user->id,
+                    'tanggal_survei'     => $validated['tanggal_survei'],
+                    'dikirim_at'         => now(),
+                    'latitude_survei'    => $validated['latitude_survei'] ?? null,
+                    'longitude_survei'   => $validated['longitude_survei'] ?? null,
+                    'lokasi_dicatat_at'  => !empty($validated['latitude_survei']) ? now() : null,
+                ]
             );
 
-            return redirect()->route('rumah.show', $rumah)->with('success', 'Survei berhasil dikirim ke Verifikator.');
-        }
+            // 2. Revisi case: hapus komponen + foto lama (file fisik + record DB)
+            $existingKomponenIds = SurveiKomponen::where('survei_id', $survei->id)->pluck('id');
+            if ($existingKomponenIds->isNotEmpty()) {
+                $oldFotos = SurveiFoto::whereIn('survei_komponen_id', $existingKomponenIds)->get();
+                foreach ($oldFotos as $oldFoto) {
+                    $this->fotoStorage->hapus($oldFoto->path_file);
+                    $oldFoto->delete();
+                }
+                SurveiKomponen::where('survei_id', $survei->id)->delete();
+            }
 
-        $this->auditLogger->catat(
-            aksi:      AuditLog::AKSI['SURVEI_DRAFT_SAVE'],
-            entitas:   'survei_kelayakan',
-            entitasId: $survei->id,
-        );
+            // 3. Insert komponen baru + upload foto (jika ada)
+            foreach ($validated['kondisi'] as $komponenId => $opsiId) {
+                $surveiKomponen = SurveiKomponen::create([
+                    'survei_id'        => $survei->id,
+                    'komponen_id'      => $komponenId,
+                    'opsi_kondisi_id'  => $opsiId,
+                ]);
 
-        return redirect()->route('rumah.show', $rumah)->with('success', 'Draf survei berhasil disimpan.');
+                $fotos = $validated['foto'][$komponenId] ?? [];
+                $currentCount = 0;
+                foreach ($fotos as $file) {
+                    if (!$file instanceof UploadedFile || !$file->isValid()) {
+                        continue;
+                    }
+
+                    $fotoData = $this->fotoStorage->simpan(
+                        $file,
+                        "survei-foto/{$rumah->id}/{$surveiKomponen->id}",
+                        $currentCount
+                    );
+
+                    SurveiFoto::create(array_merge(
+                        ['survei_komponen_id' => $surveiKomponen->id],
+                        $fotoData
+                    ));
+                    $currentCount++;
+                }
+            }
+
+            // 4. Update status workflow
+            $this->workflow->ajukan($rumah, $user);
+
+            $this->auditLogger->catat(
+                aksi: AuditLog::AKSI['SURVEI_SUBMIT'],
+                entitas: 'rumah_warga',
+                entitasId: $rumah->id,
+                dataBaru: [
+                    'survei_id' => $survei->id,
+                    'status'    => $rumah->fresh()->status,
+                    'gps_lat'   => $validated['latitude_survei'] ?? null,
+                    'gps_lng'   => $validated['longitude_survei'] ?? null,
+                    'foto_count' => SurveiFoto::whereHas('surveiKomponen', function ($q) use ($survei) {
+                        $q->where('survei_id', $survei->id);
+                    })->count(),
+                ],
+            );
+        });
+
+        return redirect()
+            ->route('survei.index')
+            ->with('success', "Survei untuk {$rumah->kode_registrasi} berhasil dikirim. Status sekarang: Diajukan (menunggu verifikasi).");
     }
 }

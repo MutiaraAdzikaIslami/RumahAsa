@@ -44,7 +44,7 @@ class RumahPolicyTest extends TestCase
         return $rt->fresh();
     }
 
-    private function getRumah(Wilayah $wilayah, User $surveyor, string $status = 'Draf'): RumahWarga
+    private function getRumah(Wilayah $wilayah, User $surveyor, string $status = 'Menunggu Survei'): RumahWarga
     {
         return RumahWarga::create([
             'kode_registrasi'      => 'TEST-' . uniqid(),
@@ -139,9 +139,9 @@ class RumahPolicyTest extends TestCase
         $admin = $this->getUser('admin');
         $pimpinan = $this->getUser('pimpinan');
 
-        $this->assertTrue($surveyor->can('create', RumahWarga::class));
+        $this->assertFalse($surveyor->can('create', RumahWarga::class)); // Arahan baru: Admin yang input
         $this->assertFalse($verifikator->can('create', RumahWarga::class));
-        $this->assertFalse($admin->can('create', RumahWarga::class));
+        $this->assertTrue($admin->can('create', RumahWarga::class)); // Arahan baru: Admin yang input
         $this->assertFalse($pimpinan->can('create', RumahWarga::class));
     }
 

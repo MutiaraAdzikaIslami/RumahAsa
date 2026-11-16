@@ -13,22 +13,42 @@ class Wilayah extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $table = 'wilayah';
+    protected $table = 'wilayah'; // PENTING: nama tabel di DB adalah 'wilayah', bukan 'wilayahs'
 
     protected $fillable = ['kode', 'nama', 'tingkat', 'parent_id', 'path', 'is_aktif'];
 
     protected $casts = ['is_aktif' => 'boolean'];
 
-    public const TINGKAT_KECAMATAN = 'kecamatan';
-    public const TINGKAT_KELURAHAN = 'kelurahan';
-    public const TINGKAT_RW        = 'rw';
-    public const TINGKAT_RT        = 'rt';
+    // === Konstanta tingkat hierarki (sesuai data Kemendagri yang ada di DB) ===
+    public const TINGKAT_PROVINSI       = 'provinsi';
+    public const TINGKAT_KABUPATEN_KOTA = 'kabupaten';  // ← DIUBAH: dari 'kabupaten_kota' jadi 'kabupaten' (match data DB)
+    public const TINGKAT_KECAMATAN      = 'kecamatan';
+    public const TINGKAT_KELURAHAN      = 'kelurahan';
+    public const TINGKAT_RW             = 'rw';
+    public const TINGKAT_RT             = 'rt';
 
     public const URUTAN_TINGKAT = [
-        self::TINGKAT_KECAMATAN => 1,
-        self::TINGKAT_KELURAHAN => 2,
-        self::TINGKAT_RW        => 3,
-        self::TINGKAT_RT        => 4,
+        self::TINGKAT_PROVINSI       => 1,
+        self::TINGKAT_KABUPATEN_KOTA => 2,
+        self::TINGKAT_KECAMATAN      => 3,
+        self::TINGKAT_KELURAHAN      => 4,
+        self::TINGKAT_RW             => 5,
+        self::TINGKAT_RT             => 6,
+    ];
+
+    public const LABEL_TINGKAT = [
+        self::TINGKAT_PROVINSI       => 'Provinsi',
+        self::TINGKAT_KABUPATEN_KOTA => 'Kabupaten/Kota',
+        self::TINGKAT_KECAMATAN      => 'Kecamatan',
+        self::TINGKAT_KELURAHAN      => 'Kelurahan/Desa',
+        self::TINGKAT_RW             => 'RW',
+        self::TINGKAT_RT             => 'RT',
+    ];
+
+    public const TINGKAT_DROPDOWN = [
+        self::TINGKAT_KABUPATEN_KOTA,
+        self::TINGKAT_KECAMATAN,
+        self::TINGKAT_KELURAHAN,
     ];
 
     public function parent(): BelongsTo
@@ -56,9 +76,16 @@ class Wilayah extends Model
         return $q->where('path', 'like', $parent->path . '/%');
     }
 
+    public function scopeDropdownTingkat(Builder $q): Builder
+    {
+        return $q->whereIn('tingkat', self::TINGKAT_DROPDOWN);
+    }
+
     public static function isValidParent(?int $parentId, string $childTingkat): bool
     {
-        if ($childTingkat === self::TINGKAT_KECAMATAN) {
+        $childUrutan = self::URUTAN_TINGKAT[$childTingkat] ?? 0;
+
+        if ($childUrutan === 1) {
             return $parentId === null;
         }
         if ($parentId === null) return false;
@@ -67,8 +94,12 @@ class Wilayah extends Model
         if (!$parent) return false;
 
         $parentUrutan = self::URUTAN_TINGKAT[$parent->tingkat] ?? 0;
-        $childUrutan  = self::URUTAN_TINGKAT[$childTingkat] ?? 0;
 
         return $parentUrutan === ($childUrutan - 1);
+    }
+
+    public function labelTingkat(): string
+    {
+        return self::LABEL_TINGKAT[$this->tingkat] ?? ucfirst($this->tingkat);
     }
 }

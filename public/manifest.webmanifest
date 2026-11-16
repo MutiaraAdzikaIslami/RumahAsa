@@ -1,0 +1,17 @@
+﻿{
+  "name": "RumahAsa",
+  "short_name": "RumahAsa",
+  "description": "Sistem Informasi Pendataan Rumah Tidak Layak Huni",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#fdfbf6",
+  "theme_color": "#2c4d2b",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

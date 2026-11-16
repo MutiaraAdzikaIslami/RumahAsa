@@ -9,3 +9,4 @@ Route::post('/',            [RumahController::class, 'store'])->name('store');
 Route::get('/{rumah}',      [RumahController::class, 'show'])->name('show');
 Route::get('/{rumah}/edit', [RumahController::class, 'edit'])->name('edit');
 Route::put('/{rumah}',      [RumahController::class, 'update'])->name('update');
+Route::delete('/{rumah}',   [RumahController::class, 'destroy'])->name('destroy');
