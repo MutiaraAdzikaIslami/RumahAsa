@@ -58,6 +58,7 @@ class AuditLog extends Model
         'FOTO_VIEW'                  => 'FOTO_VIEW',
         // Workflow
         'STATUS_CHANGE'              => 'STATUS_CHANGE',
+        'BANTUAN_CREATE' => 'BANTUAN_CREATE',
         // (akan ditambah saat modul lain dibuat: VERIFIKASI_*, BANTUAN_*, PROGRES_*, EKSPOR_*)
     ];
 
