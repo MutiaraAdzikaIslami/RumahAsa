@@ -55,6 +55,14 @@
                     <i data-lucide="list" class="w-4 h-4"></i>
                     Daftar Rumah
                 </a>
+                @can('access-verifikator')
+                <a href="{{ route('verifikator.survei.index') }}" class="flex items-center justify-between px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('verifikator.*') ? 'bg-forest-light font-semibold' : '' }}">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="clipboard-check" class="w-4 h-4 text-terracotta"></i>
+                        <span>Antrean Survei</span>
+                    </div>
+                </a>
+                @endcan
                 @can('input-rumah')
                 <a href="{{ route('rumah.create') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('rumah.create') ? 'bg-forest-light' : '' }}">
                     <i data-lucide="plus-circle" class="w-4 h-4"></i>
