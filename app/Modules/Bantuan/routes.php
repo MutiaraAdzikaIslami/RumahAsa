@@ -22,3 +22,10 @@ Route::middleware('role:verifikator')->group(function () {
     Route::put('/{rumah}/progres/{progres}',       [$c, 'update'])->name('progres.update');
     Route::delete('/{rumah}/progres/{progres}',    [$c, 'destroy'])->name('progres.destroy');
 });
+
+// Pemantauan progres: semua peran bantuan boleh melihat, hanya Verifikator yang menetapkan Selesai
+Route::get('/{rumah}', [\App\Modules\Bantuan\Http\Controllers\PemantauanController::class, 'show'])->name('show');
+
+Route::middleware('role:verifikator')->group(function () {
+    Route::post('/{rumah}/selesai', [\App\Modules\Bantuan\Http\Controllers\PemantauanController::class, 'selesai'])->name('selesai');
+});
