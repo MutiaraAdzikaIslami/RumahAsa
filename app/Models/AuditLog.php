@@ -59,6 +59,9 @@ class AuditLog extends Model
         // Workflow
         'STATUS_CHANGE'              => 'STATUS_CHANGE',
         'BANTUAN_CREATE' => 'BANTUAN_CREATE',
+        'PROGRES_CREATE' => 'PROGRES_CREATE',
+        'PROGRES_UPDATE' => 'PROGRES_UPDATE',
+        'PROGRES_DELETE' => 'PROGRES_DELETE',
         // (akan ditambah saat modul lain dibuat: VERIFIKASI_*, BANTUAN_*, PROGRES_*, EKSPOR_*)
     ];
 
