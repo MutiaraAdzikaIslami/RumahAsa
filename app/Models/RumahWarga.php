@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RumahWarga extends Model
@@ -78,6 +79,21 @@ class RumahWarga extends Model
     public function riwayatStatus(): HasMany
     {
         return $this->hasMany(RiwayatStatus::class, 'rumah_id');
+    }
+
+    public function penerimaBantuan(): HasOne
+    {
+        return $this->hasOne(PenerimaBantuan::class, 'rumah_id');
+    }
+
+    public function penilaian(): HasMany
+    {
+        return $this->hasMany(Penilaian::class, 'rumah_id')->orderBy('id', 'desc');
+    }
+
+    public function penilaianAktif(): HasOne
+    {
+        return $this->hasOne(Penilaian::class, 'rumah_id')->where('is_aktif', true)->latestOfMany();
     }
 
     public function bisaDiedit(): bool

@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
+use App\Models\PenerimaBantuan;
+use App\Models\Penilaian;
 use App\Models\Role;
 use App\Models\RumahWarga;
 use App\Models\User;
@@ -77,6 +79,14 @@ class StatusWorkflowTest extends TestCase
         $this->workflow->tetapkanKategori($rumah, 'layak_huni', 'Rumah layak huni', $verifikator);
 
         $this->assertSame('Layak Huni', $rumah->fresh()->status);
+        $this->assertDatabaseHas('penilaian', [
+            'rumah_id' => $rumah->id,
+            'kategori' => 'layak_huni',
+            'catatan' => 'Rumah layak huni',
+        ]);
+        $this->assertDatabaseMissing('penerima_bantuan', [
+            'rumah_id' => $rumah->id,
+        ]);
     }
 
     public function test_diajukan_bisa_ditetapkan_tidak_layak_huni(): void
@@ -87,6 +97,15 @@ class StatusWorkflowTest extends TestCase
         $this->workflow->tetapkanKategori($rumah, 'tidak_layak_huni', 'Rumah tidak layak huni', $verifikator);
 
         $this->assertSame('Penerima Bantuan', $rumah->fresh()->status);
+        $this->assertDatabaseHas('penilaian', [
+            'rumah_id' => $rumah->id,
+            'kategori' => 'tidak_layak_huni',
+            'catatan' => 'Rumah tidak layak huni',
+        ]);
+        $this->assertDatabaseHas('penerima_bantuan', [
+            'rumah_id' => $rumah->id,
+            'status_bantuan' => PenerimaBantuan::STATUS_MENUNGGU_PENYALURAN,
+        ]);
     }
 
     public function test_penerima_bantuan_bisa_mulai_renovasi(): void

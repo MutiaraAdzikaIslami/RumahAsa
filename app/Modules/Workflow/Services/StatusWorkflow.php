@@ -3,6 +3,8 @@
 namespace App\Modules\Workflow\Services;
 
 use App\Models\AuditLog;
+use App\Models\PenerimaBantuan;
+use App\Models\Penilaian;
 use App\Models\RiwayatStatus;
 use App\Models\RumahWarga;
 use App\Models\User;
@@ -116,6 +118,7 @@ class StatusWorkflow
             user:      $user,
             catatan:   $catatan,
             auditAksi: AuditLog::AKSI['STATUS_CHANGE'],
+            kategori:  $kategori,
         );
     }
 
@@ -129,12 +132,17 @@ class StatusWorkflow
             ? RumahWarga::STATUS_PENERIMA_BANTUAN
             : RumahWarga::STATUS_LAYAK_HUNI;
 
+        $kategori = $to === RumahWarga::STATUS_PENERIMA_BANTUAN
+            ? 'tidak_layak_huni'
+            : 'layak_huni';
+
         $this->transition(
             rumah:     $rumah,
             to:        $to,
             user:      $user,
             catatan:   $catatan,
             auditAksi: AuditLog::AKSI['STATUS_CHANGE'],
+            kategori:  $kategori,
         );
     }
 
@@ -169,7 +177,7 @@ class StatusWorkflow
 
     /**
      * Jalankan transisi status dalam satu transaksi DB.
-     * Menulis: rumah_warga.status + riwayat_status + audit_log.
+     * Menulis: rumah_warga.status + riwayat_status + penerima_bantuan (jika RTLH) + penilaian + audit_log.
      *
      * @throws InvalidStatusTransitionException
      */
@@ -179,6 +187,7 @@ class StatusWorkflow
         ?User $user,
         string $catatan,
         string $auditAksi,
+        ?string $kategori = null,
     ): void {
         $from = $rumah->status;
         $user = $user ?? Auth::user();
@@ -187,7 +196,7 @@ class StatusWorkflow
             throw InvalidStatusTransitionException::make($from, $to);
         }
 
-        DB::transaction(function () use ($rumah, $from, $to, $user, $catatan, $auditAksi) {
+        DB::transaction(function () use ($rumah, $from, $to, $user, $catatan, $auditAksi, $kategori) {
             // 1. Update status rumah
             $rumah->status = $to;
             $rumah->save();
@@ -201,7 +210,29 @@ class StatusWorkflow
                 'catatan'     => $catatan,
             ]);
 
-            // 3. Tulis audit log
+            // 3. Tulis riwayat Penilaian jika kategori ditentukan
+            if ($kategori !== null) {
+                Penilaian::where('rumah_id', $rumah->id)->where('is_aktif', true)->update(['is_aktif' => false]);
+
+                Penilaian::create([
+                    'rumah_id' => $rumah->id,
+                    'kategori' => $kategori,
+                    'catatan'  => $catatan,
+                    'is_aktif' => true,
+                ]);
+            }
+
+            // 4. SCRUM-114: Buat entri Penerima Bantuan jika Tidak Layak Huni
+            if ($to === RumahWarga::STATUS_PENERIMA_BANTUAN) {
+                PenerimaBantuan::firstOrCreate(
+                    ['rumah_id' => $rumah->id],
+                    [
+                        'status_bantuan' => PenerimaBantuan::STATUS_MENUNGGU_PENYALURAN,
+                    ]
+                );
+            }
+
+            // 5. Tulis audit log
             $this->auditLogger->catat(
                 aksi:      $auditAksi,
                 entitas:   'rumah_warga',
