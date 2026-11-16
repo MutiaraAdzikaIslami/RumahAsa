@@ -85,7 +85,7 @@ class ProgresRenovasiTest extends TestCase
 
         foreach (['admin', 'pimpinan'] as $role) {
             $user = $this->buatUser($role);
-            $this->actingAs($user)->get("/bantuan/{$rumah->id}/progres")->assertOk()->assertSee('Pondasi');
+            $this->actingAs($user)->get("/bantuan/{$rumah->id}/progres")->assertOk()->assertSee('Tahap uji');
             $this->actingAs($user)->post("/bantuan/{$rumah->id}/progres", $this->dataProgres())->assertForbidden();
         }
     }
