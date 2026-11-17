@@ -64,4 +64,63 @@ class BantuanIndexTest extends TestCase
             ->assertSee('Budi Penerima')
             ->assertDontSee('Siti Lain');
     }
+
+    public function test_pencarian_menyaring_alamat_dan_kode(): void
+    {
+        $rumah1 = $this->buatRumah('Penerima Bantuan', 'Warga Satu');
+        $rumah2 = $this->buatRumah('Penerima Bantuan', 'Warga Dua');
+
+        $this->actingAs($this->buatUser('verifikator'))
+            ->get("/bantuan?search={$rumah1->kode_registrasi}")
+            ->assertSee('Warga Satu')
+            ->assertDontSee('Warga Dua');
+
+        $this->actingAs($this->buatUser('verifikator'))
+            ->get("/bantuan?search={$rumah2->alamat}")
+            ->assertSee('Warga Dua')
+            ->assertDontSee('Warga Satu');
+    }
+
+    public function test_filter_status_menyaring_rumah(): void
+    {
+        $this->buatRumah('Penerima Bantuan', 'Budi Calon');
+        $this->buatRumah('Dalam Renovasi', 'Agus Renovasi');
+        $this->buatRumah('Selesai', 'Dewi Selesai');
+
+        $response = $this->actingAs($this->buatUser('verifikator'))
+            ->get('/bantuan?status=Dalam Renovasi');
+
+        $response->assertOk()
+            ->assertSee('Agus Renovasi')
+            ->assertDontSee('Budi Calon')
+            ->assertDontSee('Dewi Selesai');
+    }
+
+    public function test_filter_wilayah_menyaring_rumah(): void
+    {
+        $rumah1 = $this->buatRumah('Penerima Bantuan', 'Warga Wilayah A');
+        $rumah2 = $this->buatRumah('Penerima Bantuan', 'Warga Wilayah B');
+
+        $response = $this->actingAs($this->buatUser('verifikator'))
+            ->get("/bantuan?wilayah_id={$rumah1->wilayah_id}");
+
+        $response->assertOk()
+            ->assertSee('Warga Wilayah A')
+            ->assertDontSee('Warga Wilayah B');
+    }
+
+    public function test_tampilkan_status_bantuan_dan_persentase_progres_terakhir(): void
+    {
+        $rumah = $this->buatRumah('Dalam Renovasi', 'Warga Progres');
+        $bantuan = $this->buatBantuan($rumah);
+        $this->buatProgres($bantuan, 30, '2026-10-10');
+        $this->buatProgres($bantuan, 65, '2026-10-20');
+
+        $this->actingAs($this->buatUser('verifikator'))
+            ->get('/bantuan')
+            ->assertOk()
+            ->assertSee('Warga Progres')
+            ->assertSee('Dalam Renovasi')
+            ->assertSee('65%');
+    }
 }
