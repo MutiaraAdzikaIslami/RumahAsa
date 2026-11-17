@@ -7,9 +7,9 @@
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-slate-900">Detail Rumah</h1>
         <div class="space-x-2">
-            @if ($rumah->bisaDiedit())
+            @can('update', $rumah)
                 <a href="{{ route('rumah.edit', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Edit Rumah</a>
-            @endif
+            @endcan
             <a href="{{ route('rumah.index') }}" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg">Kembali</a>
         </div>
     </div>
@@ -21,6 +21,7 @@
     <div class="bg-white rounded-lg shadow p-4">
         @php
             $badgeColors = [
+                'Menunggu Disurvei' => 'bg-slate-100 text-slate-700',
                 'Draf' => 'bg-slate-100 text-slate-700',
                 'Diajukan' => 'bg-blue-100 text-blue-700',
                 'Perlu Perbaikan' => 'bg-amber-100 text-amber-700',
@@ -123,14 +124,18 @@
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-slate-900">Survei Kelayakan</h2>
-            @if ($rumah->bisaDiedit())
+            @can('survei', $rumah)
                 <a href="{{ route('survei.create', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Isi Survei</a>
-            @endif
+            @endcan
         </div>
         @if ($rumah->survei->isEmpty())
             <p class="text-slate-500 text-sm">Belum ada survei.</p>
         @else
-            <p class="text-sm text-slate-600">Survei sudah dibuat. Klik "Isi Survei" untuk melanjutkan pengisian.</p>
+            @can('survei', $rumah)
+                <p class="text-sm text-slate-600">Survei sudah dibuat. Klik "Isi Survei" untuk melanjutkan pengisian.</p>
+            @else
+                <p class="text-sm text-slate-600">Survei sudah dibuat.</p>
+            @endcan
         @endif
     </div>
 

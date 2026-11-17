@@ -21,7 +21,7 @@ class RumahWargaFactory extends Factory
         ]);
         
         return [
-            'kode_registrasi'      => 'RUMAH-' . date('Y') . '-' . $this->faker->unique()->numerify('####'),
+            'kode_registrasi'      => 'RW-' . date('Y') . '-' . $this->faker->unique()->numerify('####'),
             'nama_kepala_keluarga' => $this->faker->name,
             'nik_enc'              => Crypt::encryptString($nik),
             'nik_hash'             => hash_hmac('sha256', $nik, config('rumahasa.nik_hmac_key', 'test')),

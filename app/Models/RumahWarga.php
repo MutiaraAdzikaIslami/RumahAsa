@@ -108,7 +108,16 @@ class RumahWarga extends Model
 
     public function bisaDiedit(): bool
     {
-        return in_array($this->status, [self::STATUS_DRAF, self::STATUS_PERLU_PERBAIKAN]);
+        return in_array($this->status, [self::STATUS_MENUNGGU_DISURVEI, self::STATUS_DRAF]);
+    }
+
+    public function bisaDisurvei(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_MENUNGGU_DISURVEI,
+            self::STATUS_DRAF,
+            self::STATUS_PERLU_PERBAIKAN,
+        ]);
     }
 
     public function nikTersamar(): string

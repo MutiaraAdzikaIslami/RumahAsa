@@ -11,6 +11,7 @@ use App\Modules\Core\Services\AuditLogger;
 use App\Modules\Workflow\Services\StatusWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Gate;
 
 class SurveiController extends Controller
 {
@@ -22,6 +23,8 @@ class SurveiController extends Controller
 
     public function create(RumahWarga $rumah)
     {
+        Gate::authorize('survei', $rumah);
+
         $komponenList = KomponenPenilaian::with('opsiKondisi')->orderBy('urutan')->get();
 
         $survei = $rumah->survei()->first();
@@ -46,6 +49,8 @@ class SurveiController extends Controller
 
     public function update(Request $request, RumahWarga $rumah, SurveiKelayakan $survei)
     {
+        Gate::authorize('survei', $rumah);
+
         $isDraft = $request->input('action') === 'draft';
 
         $rules = [];
@@ -82,6 +87,10 @@ class SurveiController extends Controller
             );
 
             return redirect()->route('rumah.show', $rumah)->with('success', 'Survei berhasil dikirim ke Verifikator.');
+        }
+
+        if ($rumah->status === RumahWarga::STATUS_MENUNGGU_DISURVEI) {
+            $this->workflow->mulaiSurvei($rumah);
         }
 
         $this->auditLogger->catat(

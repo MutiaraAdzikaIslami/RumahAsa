@@ -40,17 +40,32 @@ class RumahPolicy
     }
 
     /**
-     * AC-05, AC-06, AC-07, AC-10: Hak akses mengubah data rumah.
-     * - Hanya Surveyor yang berwenang di wilayah tugas rumah tersebut.
-     * - Status rumah harus bisa diedit (Draf atau Perlu Perbaikan).
-     * - Pimpinan: Ditolak (read-only).
+     * Hak akses mengubah data rumah:
+     * - Hanya Admin yang berwenang.
+     * - Status rumah harus bisa diedit (Menunggu Disurvei atau Draf).
+     * - Surveyor, Verifikator, Pimpinan: Ditolak.
      */
     public function update(User $user, RumahWarga $rumah): bool
     {
-        if ($user->isPimpinan()) {
+        if (!$user->isAdmin()) {
             return false;
         }
 
+        if (!$rumah->bisaDiedit()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Hak akses mengisi survei kelayakan:
+     * - Hanya Surveyor yang berwenang di wilayah tugas rumah tersebut.
+     * - Status rumah harus bisa disurvei (Menunggu Disurvei, Draf, atau Perlu Perbaikan).
+     * - Admin, Verifikator, Pimpinan: Ditolak.
+     */
+    public function survei(User $user, RumahWarga $rumah): bool
+    {
         if (!$user->isSurveyor()) {
             return false;
         }
@@ -59,7 +74,7 @@ class RumahPolicy
             return false;
         }
 
-        if (!$rumah->bisaDiedit()) {
+        if (!$rumah->bisaDisurvei()) {
             return false;
         }
 

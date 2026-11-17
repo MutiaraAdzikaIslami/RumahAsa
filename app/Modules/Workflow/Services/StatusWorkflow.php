@@ -37,6 +37,10 @@ class StatusWorkflow
      * Matriks transisi status yang diizinkan.
      */
     private const TRANSITIONS = [
+        RumahWarga::STATUS_MENUNGGU_DISURVEI => [
+            RumahWarga::STATUS_DRAF,
+            RumahWarga::STATUS_DIAJUKAN,
+        ],
         RumahWarga::STATUS_DRAF => [
             RumahWarga::STATUS_DIAJUKAN,
         ],
@@ -71,6 +75,22 @@ class StatusWorkflow
     {
         $allowed = self::TRANSITIONS[$from] ?? [];
         return in_array($to, $allowed, true);
+    }
+
+    /**
+     * Surveyor mulai mengisi survei (Menunggu Disurvei -> Draf).
+     */
+    public function mulaiSurvei(RumahWarga $rumah, ?User $user = null): void
+    {
+        if ($rumah->status === RumahWarga::STATUS_MENUNGGU_DISURVEI) {
+            $this->transition(
+                rumah:     $rumah,
+                to:        RumahWarga::STATUS_DRAF,
+                user:      $user,
+                catatan:   'Survei dimulai oleh Surveyor',
+                auditAksi: AuditLog::AKSI['SURVEI_DRAFT_SAVE'],
+            );
+        }
     }
 
     /**

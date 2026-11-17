@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreignId('surveyor_id')->constrained('users')->restrictOnDelete();
             
             $table->enum('status', [
-                'Draf', 'Diajukan', 'Perlu Perbaikan', 'Layak Huni',
+                'Menunggu Disurvei', 'Draf', 'Diajukan', 'Perlu Perbaikan', 'Layak Huni',
                 'Penerima Bantuan', 'Dalam Renovasi', 'Selesai',
             ])->default('Draf');
             

@@ -182,8 +182,26 @@ class StatusWorkflowTest extends TestCase
         $this->assertGreaterThanOrEqual(3, count($updateQueries) + count($insertQueries));
     }
 
+    public function test_menunggu_disurvei_bisa_mulai_survei_ke_draf(): void
+    {
+        $rumah = $this->makeRumah(RumahWarga::STATUS_MENUNGGU_DISURVEI);
+        $surveyor = $this->makeUser('surveyor');
+
+        $this->workflow->mulaiSurvei($rumah, $surveyor);
+
+        $this->assertSame(RumahWarga::STATUS_DRAF, $rumah->fresh()->status);
+        $this->assertDatabaseHas('riwayat_status', [
+            'rumah_id'    => $rumah->id,
+            'status_dari' => RumahWarga::STATUS_MENUNGGU_DISURVEI,
+            'status_ke'   => RumahWarga::STATUS_DRAF,
+            'user_id'     => $surveyor->id,
+        ]);
+    }
+
     public function test_can_transition_check_method(): void
     {
+        $this->assertTrue($this->workflow->canTransition('Menunggu Disurvei', 'Draf'));
+        $this->assertTrue($this->workflow->canTransition('Menunggu Disurvei', 'Diajukan'));
         $this->assertTrue($this->workflow->canTransition('Draf', 'Diajukan'));
         $this->assertTrue($this->workflow->canTransition('Diajukan', 'Penerima Bantuan'));
         $this->assertTrue($this->workflow->canTransition('Penerima Bantuan', 'Dalam Renovasi'));

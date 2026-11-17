@@ -10,6 +10,7 @@ use App\Modules\Core\Services\AuditLogger;
 use App\Modules\Core\Services\NikEncryptor;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Gate;
 
 class RumahController extends Controller
 {
@@ -65,8 +66,13 @@ class RumahController extends Controller
 
     public function create()
     {
-        // Ambil semua RT untuk dropdown wilayah
-        $rtList = Wilayah::where('tingkat', 'rt')->orderBy('nama')->get();
+        Gate::authorize('create', RumahWarga::class);
+
+        // Ambil semua wilayah tingkat RT & RW untuk dropdown
+        $rtList = Wilayah::whereIn('tingkat', [Wilayah::TINGKAT_RT, Wilayah::TINGKAT_RW])
+            ->with('parent')
+            ->orderBy('path')
+            ->get();
         
         // FIX: Ambil daftar surveyor untuk dropdown (Admin yang input, pilih surveyor)
         $surveyorList = User::whereHas('role', function ($q) {
@@ -78,6 +84,8 @@ class RumahController extends Controller
 
     public function store(Request $request)
     {
+        Gate::authorize('create', RumahWarga::class);
+
         $isDraft = $request->input('action') === 'draft';
 
         $rules = [
@@ -119,9 +127,9 @@ class RumahController extends Controller
         unset($validated['nik'], $validated['no_kk']);
 
         $count = RumahWarga::withTrashed()->count() + 1;
-        $validated['kode_registrasi'] = 'RUMAH-' . date('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        $validated['kode_registrasi'] = 'RW-' . date('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
         // FIX: surveyor_id diambil dari input Admin, bukan auth()->id()
-        $validated['status'] = RumahWarga::STATUS_DRAF;
+        $validated['status'] = $isDraft ? RumahWarga::STATUS_DRAF : RumahWarga::STATUS_MENUNGGU_DISURVEI;
 
         $rumah = RumahWarga::create($validated);
 
@@ -144,7 +152,12 @@ class RumahController extends Controller
 
     public function edit(RumahWarga $rumah)
     {
-        $rtList = Wilayah::where('tingkat', 'rt')->orderBy('nama')->get();
+        Gate::authorize('update', $rumah);
+
+        $rtList = Wilayah::whereIn('tingkat', [Wilayah::TINGKAT_RT, Wilayah::TINGKAT_RW])
+            ->with('parent')
+            ->orderBy('path')
+            ->get();
         $surveyorList = User::whereHas('role', function ($q) {
             $q->where('kode', 'surveyor');
         })->where('is_aktif', true)->orderBy('nama')->get();
@@ -158,6 +171,8 @@ class RumahController extends Controller
 
     public function update(Request $request, RumahWarga $rumah)
     {
+        Gate::authorize('update', $rumah);
+
         $isDraft = $request->input('action') === 'draft';
 
         $rules = [

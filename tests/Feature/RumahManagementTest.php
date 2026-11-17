@@ -58,7 +58,12 @@ class RumahManagementTest extends TestCase
         ]);
 
         $response->assertRedirect(); // redirect ke rumah.show
-        $this->assertDatabaseHas('rumah_warga', ['nama_kepala_keluarga' => 'Budi Santoso']);
+        $this->assertDatabaseHas('rumah_warga', [
+            'nama_kepala_keluarga' => 'Budi Santoso',
+            'status'               => 'Menunggu Disurvei',
+        ]);
+        $saved = RumahWarga::where('nama_kepala_keluarga', 'Budi Santoso')->first();
+        $this->assertStringStartsWith('RW-', $saved->kode_registrasi);
     }
 
     public function test_admin_bisa_simpan_draf_kosong(): void
@@ -79,7 +84,7 @@ class RumahManagementTest extends TestCase
         $nik = '1111222233334444';
 
         RumahWarga::create([
-            'kode_registrasi'      => 'RUMAH-2026-9999',
+            'kode_registrasi'      => 'RW-2026-9999',
             'nama_kepala_keluarga' => 'Existing User',
             'nik_enc'              => $nikEncryptor->encryptNik($nik),
             'nik_hash'             => $nikEncryptor->hashNik($nik),
@@ -119,7 +124,7 @@ class RumahManagementTest extends TestCase
         // Bikin rumah di wilayah lain
         $nikEncryptor = app(\App\Modules\Core\Services\NikEncryptor::class);
         $rumahLain = RumahWarga::create([
-            'kode_registrasi'      => 'RUMAH-2026-8888',
+            'kode_registrasi'      => 'RW-2026-8888',
             'nama_kepala_keluarga' => 'User Wilayah Lain',
             'nik_enc'              => $nikEncryptor->encryptNik('1234567890123456'),
             'nik_hash'             => $nikEncryptor->hashNik('1234567890123456'),
@@ -157,5 +162,61 @@ class RumahManagementTest extends TestCase
             'aksi'     => 'RUMAH_CREATE',
             'entitas'  => 'rumah_warga',
         ]);
+    }
+
+    public function test_admin_bisa_edit_rumah_berstatus_menunggu_disurvei_atau_draf(): void
+    {
+        $rumah = RumahWarga::create([
+            'kode_registrasi'      => 'RW-2026-0001',
+            'nama_kepala_keluarga' => 'Budi Lama',
+            'wilayah_id'           => $this->rt->id,
+            'surveyor_id'          => $this->surveyor->id,
+            'status'               => RumahWarga::STATUS_MENUNGGU_DISURVEI,
+        ]);
+
+        // Admin buka form edit
+        $this->actingAs($this->admin)->get("/rumah/{$rumah->id}/edit")->assertOk();
+
+        // Admin update data
+        $response = $this->actingAs($this->admin)->put("/rumah/{$rumah->id}", [
+            'nama_kepala_keluarga' => 'Budi Baru',
+            'nik'                  => '3201123456789012',
+            'no_kk'                => '3201123456789012',
+            'alamat'               => 'Jl. Baru No. 10',
+            'wilayah_id'           => $this->rt->id,
+            'surveyor_id'          => $this->surveyor->id,
+            'action'               => 'save',
+        ]);
+
+        $response->assertRedirect(route('rumah.show', $rumah));
+        $this->assertSame('Budi Baru', $rumah->fresh()->nama_kepala_keluarga);
+    }
+
+    public function test_surveyor_dan_verifikator_tidak_bisa_akses_edit_rumah_ditolak_403(): void
+    {
+        $rumah = RumahWarga::create([
+            'kode_registrasi'      => 'RW-2026-0002',
+            'nama_kepala_keluarga' => 'Kepala Keluarga',
+            'wilayah_id'           => $this->rt->id,
+            'surveyor_id'          => $this->surveyor->id,
+            'status'               => RumahWarga::STATUS_DRAF,
+        ]);
+
+        $roleVerif = Role::where('kode', 'verifikator')->first();
+        $verifikator = User::factory()->create(['role_id' => $roleVerif->id, 'must_change_password' => false]);
+
+        // Surveyor coba edit
+        $this->actingAs($this->surveyor)->get("/rumah/{$rumah->id}/edit")->assertStatus(403);
+        $this->actingAs($this->surveyor)->put("/rumah/{$rumah->id}", [
+            'nama_kepala_keluarga' => 'Hacked by Surveyor',
+            'surveyor_id'          => $this->surveyor->id,
+        ])->assertStatus(403);
+
+        // Verifikator coba edit
+        $this->actingAs($verifikator)->get("/rumah/{$rumah->id}/edit")->assertStatus(403);
+        $this->actingAs($verifikator)->put("/rumah/{$rumah->id}", [
+            'nama_kepala_keluarga' => 'Hacked by Verifikator',
+            'surveyor_id'          => $this->surveyor->id,
+        ])->assertStatus(403);
     }
 }

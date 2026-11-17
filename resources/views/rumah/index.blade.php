@@ -78,6 +78,7 @@
                     <td class="py-2 px-3">
                         @php
                             $badgeColors = [
+                                'Menunggu Disurvei' => 'bg-slate-100 text-slate-700',
                                 'Draf' => 'bg-slate-100 text-slate-700',
                                 'Diajukan' => 'bg-blue-100 text-blue-700',
                                 'Perlu Perbaikan' => 'bg-amber-100 text-amber-700',

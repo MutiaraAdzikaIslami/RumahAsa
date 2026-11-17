@@ -67,11 +67,13 @@
                     <input type="number" name="luas_rumah" value="{{ old('luas_rumah') }}" step="0.01" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Mis. 36.50">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Wilayah RT <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Wilayah (RT / RW) <span class="text-red-500">*</span></label>
                     <select name="wilayah_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-                        <option value="">Pilih RT...</option>
+                        <option value="">Pilih Wilayah...</option>
                         @foreach ($rtList as $rt)
-                            <option value="{{ $rt->id }}" {{ old('wilayah_id') == $rt->id ? 'selected' : '' }}>{{ $rt->nama }} ({{ $rt->kode }})</option>
+                            <option value="{{ $rt->id }}" {{ old('wilayah_id') == $rt->id ? 'selected' : '' }}>
+                                [{{ strtoupper($rt->tingkat) }}] {{ $rt->parent ? $rt->parent->nama . ' - ' : '' }}{{ $rt->nama }} ({{ $rt->kode }})
+                            </option>
                         @endforeach
                     </select>
                 </div>
