@@ -69,7 +69,11 @@ class UserController extends Controller
             ->orderBy('nama')
             ->get(['id', 'kode', 'nama']);
 
-        return view('users.create', compact('roles', 'kabupatenList'));
+        $kecamatanList = Wilayah::where('tingkat', Wilayah::TINGKAT_KECAMATAN)
+            ->orderBy('nama')
+            ->get(['id', 'parent_id', 'kode', 'nama']);
+
+        return view('users.create', compact('roles', 'kabupatenList', 'kecamatanList'));
     }
 
     public function store(StoreUserRequest $request): JsonResponse|RedirectResponse
@@ -98,10 +102,15 @@ class UserController extends Controller
             ->orderBy('nama')
             ->get(['id', 'kode', 'nama']);
 
+        $kecamatanList = Wilayah::where('tingkat', Wilayah::TINGKAT_KECAMATAN)
+            ->orderBy('nama')
+            ->get(['id', 'parent_id', 'kode', 'nama']);
+
         return view('users.create', [
             'user'          => $user,
             'roles'         => $roles,
             'kabupatenList' => $kabupatenList,
+            'kecamatanList' => $kecamatanList,
         ]);
     }
 

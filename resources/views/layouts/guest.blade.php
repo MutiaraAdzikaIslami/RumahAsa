@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     {{-- Favicon --}}
-    <link rel="icon" type="image/svg+xml" href="{{ asset('logo.svg') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ asset('logo.svg?v=4') }}">
     <title>{{ config('app.name', 'RumahAsa') }} — @yield('title', 'Login')</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">

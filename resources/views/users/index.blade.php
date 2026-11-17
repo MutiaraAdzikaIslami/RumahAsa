@@ -12,7 +12,7 @@
             <p class="mt-1 text-sm text-forest-600">Kelola akun, role, dan wilayah tugas pengguna RumahAsa.</p>
         </div>
         <a href="{{ route('users.create') }}"
-           class="inline-flex items-center justify-center gap-2 rounded-xl bg-forest-700 px-5 py-2.5 text-sm font-semibold text-cream-50 shadow-sm transition hover:bg-forest-800">
+           class="inline-flex items-center justify-center gap-2 rounded-xl bg-forest-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-forest-800">
             <i data-lucide="plus" class="h-4 w-4"></i>
             Tambah User
         </a>
@@ -52,7 +52,7 @@
             @endforeach
         </select>
         <div class="flex gap-2">
-            <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-forest-700 px-4 py-2.5 text-sm font-medium text-cream-50 hover:bg-forest-800">
+            <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-forest-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-forest-800">
                 <i data-lucide="filter" class="h-4 w-4"></i> Filter
             </button>
             <a href="{{ route('users.index') }}" class="rounded-xl border border-forest-100 bg-white px-4 py-2.5 text-sm font-medium text-forest-700 hover:bg-cream-50">Reset</a>
@@ -85,7 +85,7 @@
                         <tr class="hover:bg-cream-50/50">
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="grid h-9 w-9 place-items-center rounded-lg bg-forest-700 text-xs font-bold text-cream-50">
+                                    <div class="grid h-9 w-9 place-items-center rounded-xl bg-forest-700 text-xs font-bold text-white">
                                         {{ strtoupper(substr($u->nama, 0, 2)) }}
                                     </div>
                                     <div>
@@ -97,11 +97,11 @@
                             <td class="px-6 py-4 text-forest-600">{{ $u->email ?? '-' }}</td>
                             <td class="px-6 py-4">
                                 @if ($u->role?->kode === 'admin')
-                                    <span class="inline-flex items-center rounded-full bg-clay-100 px-2.5 py-0.5 text-xs font-semibold text-clay-600">Admin</span>
+                                    <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">Admin</span>
                                 @elseif ($u->role?->kode === 'surveyor')
-                                    <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">Surveyor</span>
+                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">Surveyor</span>
                                 @elseif ($u->role?->kode === 'verifikator')
-                                    <span class="inline-flex items-center rounded-full bg-clay-100 px-2.5 py-0.5 text-xs font-semibold text-clay-600">Verifikator</span>
+                                    <span class="inline-flex items-center rounded-full bg-amber-100/80 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Verifikator</span>
                                 @else
                                     <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">{{ $u->role?->nama ?? '-' }}</span>
                                 @endif
@@ -117,7 +117,7 @@
                                 @if ($u->deleted_at)
                                     <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600">Dihapus</span>
                                 @elseif (!$u->is_aktif)
-                                    <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-500">Nonaktif</span>
+                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">Nonaktif</span>
                                 @else
                                     <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">Aktif</span>
                                 @endif
@@ -173,9 +173,9 @@
 
 {{-- Pop-Up Modal Password Sementara (Create & Reset Password) --}}
 @if (session('generated_password'))
-<div id="modal-generated-password" class="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/60 p-4 backdrop-blur-xs">
+<div id="modal-generated-password" class="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/60 p-4 backdrop-blur-sm">
     <div class="w-full max-w-md overflow-hidden rounded-2xl border border-forest-100 bg-white shadow-2xl">
-        <div class="border-b border-forest-100 bg-forest-700 px-6 py-4 text-cream-50">
+        <div class="border-b border-forest-100 bg-forest-700 px-6 py-4 text-white">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                     <i data-lucide="key-round" class="h-5 w-5 text-gold-400"></i>
@@ -201,7 +201,7 @@
                 <div class="mt-1 flex items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50/70 px-3.5 py-2.5">
                     <code id="gen-password" class="font-mono text-base font-bold tracking-wider text-forest-900 select-all">{{ session('generated_password') }}</code>
                     <button type="button" id="btn-copy-password"
-                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-forest-700 px-3 py-1.5 text-xs font-semibold text-cream-50 hover:bg-forest-800">
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-forest-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-forest-800">
                         <i data-lucide="copy" class="h-3.5 w-3.5"></i>
                         <span id="copy-label">Salin</span>
                     </button>
@@ -216,7 +216,7 @@
 
         <div class="flex items-center justify-end border-t border-forest-100 bg-cream-50/60 px-6 py-3.5">
             <button type="button" onclick="document.getElementById('modal-generated-password').remove()"
-                    class="rounded-lg bg-forest-700 px-5 py-2 text-sm font-semibold text-cream-50 hover:bg-forest-800">
+                    class="rounded-lg bg-forest-700 px-5 py-2 text-sm font-semibold text-white hover:bg-forest-800">
                 Saya Sudah Menyimpannya
             </button>
         </div>

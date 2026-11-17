@@ -1,10 +1,5 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="14" fill="#2c4d2b"/>
-  <text x="32" y="46"
-        font-family="Plus Jakarta Sans, Arial, sans-serif"
-        font-size="42"
-        font-weight="800"
-        fill="#fdfbf6"
-        text-anchor="middle">R</text>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="64" height="64" rx="16" fill="#1D4034"/>
+    <path d="M32 13L13 28.5V48C13 49.6569 14.3431 51 16 51H48C49.6569 51 51 49.6569 51 48V28.5L45 23.6V17C45 16.4477 44.5523 16 44 16H40C39.4477 16 39 16.4477 39 17V18.7L32 13Z" fill="#FFFFFF"/>
+    <rect x="27" y="34" width="10" height="10" rx="2" fill="#1D4034"/>
 </svg>

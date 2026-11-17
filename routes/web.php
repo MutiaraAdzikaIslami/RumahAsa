@@ -29,6 +29,18 @@ Route::middleware(['auth', 'must.change.pwd'])->group(function () {
     // FR-31: Heatmap renovasi (Verifikator, Surveyor, Pimpinan) — SCRUM-159 s.d. SCRUM-163
     Route::get('/heatmap/data', [HeatmapController::class, 'data'])->name('heatmap.data');
 
+    // API Internal Cascading Wilayah (terstandar di dalam grup auth + must.change.pwd)
+    Route::prefix('api/wilayah')->name('api.wilayah.')->group(function () {
+        Route::get('/kabupaten', [WilayahController::class, 'getKabupaten'])
+            ->name('kabupaten');
+        Route::get('/kabupaten/{kabupatenId}/kecamatan', [WilayahController::class, 'getKecamatan'])
+            ->whereNumber('kabupatenId')
+            ->name('kecamatan');
+        Route::get('/kecamatan/{kecamatanId}/kelurahan', [WilayahController::class, 'getKelurahan'])
+            ->whereNumber('kecamatanId')
+            ->name('kelurahan');
+    });
+
     // scrum-17: Kelola Wilayah (FR-08) — admin only
     Route::middleware('role:manage-wilayah')->prefix('wilayah')->name('wilayah.')->group(function () {
         // FIX: Arahkan ke WilayahController@index supaya pagination & filter jalan
