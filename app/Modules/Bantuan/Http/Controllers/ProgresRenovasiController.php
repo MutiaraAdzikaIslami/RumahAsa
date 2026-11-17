@@ -4,32 +4,42 @@ namespace App\Modules\Bantuan\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\PenerimaBantuan;
+use App\Models\ProgresFoto;
 use App\Models\ProgresRenovasi;
 use App\Models\RumahWarga;
 use App\Modules\Bantuan\Services\AturanProgres;
 use App\Modules\Core\Services\AuditLogger;
+use App\Modules\Core\Services\FotoStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 
 /**
- * CRUD progres renovasi. Perubahan hanya oleh Verifikator; Admin dan Pimpinan hanya melihat.
+ * CRUD progres renovasi (FR-22 & FR-23: Surveyor & Verifikator).
  */
 class ProgresRenovasiController extends Controller
 {
     public function __construct(
         private readonly AuditLogger $auditLogger,
         private readonly AturanProgres $aturan,
+        private readonly FotoStorageService $fotoService,
     ) {
     }
 
     public function index(RumahWarga $rumah)
     {
         $bantuan = $this->bantuan($rumah);
+        $daftar = $bantuan->progres()->with('fotos')->orderBy('tanggal_progres', 'desc')->orderBy('id', 'desc')->get();
+
+        $daftarRumahRenovasi = RumahWarga::whereIn('status', [
+            RumahWarga::STATUS_DALAM_RENOVASI,
+            RumahWarga::STATUS_PENERIMA_BANTUAN,
+        ])->orderBy('nama_kepala_keluarga')->get();
 
         return view('bantuan.progres.index', [
-            'rumah'   => $rumah,
-            'bantuan' => $bantuan,
-            'daftar'  => $bantuan->progres,
+            'rumah'               => $rumah,
+            'bantuan'             => $bantuan,
+            'daftar'              => $daftar,
+            'daftarRumahRenovasi' => $daftarRumahRenovasi,
         ]);
     }
 
@@ -50,6 +60,8 @@ class ProgresRenovasiController extends Controller
         }
 
         $progres = $bantuan->progres()->create($data);
+
+        $this->simpanFotoUpload($request, $bantuan, $progres);
 
         $this->auditLogger->catat(
             aksi:      AuditLog::AKSI['PROGRES_CREATE'],
@@ -81,6 +93,8 @@ class ProgresRenovasiController extends Controller
 
         $dataLama = $progres->only(['tahap_pekerjaan', 'persentase', 'tanggal_progres', 'catatan']);
         $progres->update($data);
+
+        $this->simpanFotoUpload($request, $bantuan, $progres);
 
         $this->auditLogger->catat(
             aksi:      AuditLog::AKSI['PROGRES_UPDATE'],
@@ -115,6 +129,31 @@ class ProgresRenovasiController extends Controller
         return redirect()->route('bantuan.progres.index', $rumah)->with('success', 'Progres renovasi dihapus.');
     }
 
+    public function showFoto(ProgresFoto $foto)
+    {
+        return $this->fotoService->sajikan($foto->path_file);
+    }
+
+    private function simpanFotoUpload(Request $request, PenerimaBantuan $bantuan, ProgresRenovasi $progres): void
+    {
+        $files = $request->file('foto');
+        if (!$files) {
+            return;
+        }
+
+        $files = is_array($files) ? $files : [$files];
+        foreach ($files as $file) {
+            if ($file && $file->isValid()) {
+                $dir = "progres-foto/{$bantuan->id}/{$progres->id}";
+                $currentCount = $progres->fotos()->count();
+                $res = $this->fotoService->simpan($file, $dir, $currentCount);
+                $progres->fotos()->create([
+                    'path_file' => $res['path_file'],
+                ]);
+            }
+        }
+    }
+
     private function bantuan(RumahWarga $rumah): PenerimaBantuan
     {
         $bantuan = $rumah->penerimaBantuan;
@@ -135,8 +174,11 @@ class ProgresRenovasiController extends Controller
             'persentase'      => 'required|integer|between:0,100',
             'tanggal_progres' => 'required|date_format:Y-m-d',
             'catatan'         => 'nullable|string|max:1000',
+            'foto'            => 'nullable',
+            'foto.*'          => 'nullable|image|max:5120',
         ]);
         $data['persentase'] = (int) $data['persentase'];
+        unset($data['foto']);
 
         return $data;
     }

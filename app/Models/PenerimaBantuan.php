@@ -12,7 +12,7 @@ class PenerimaBantuan extends Model
 
     protected $fillable = [
         'rumah_id', 'status_bantuan', 'tanggal_bantuan',
-        'jenis_bantuan', 'nominal', 'nomor_sk',
+        'jenis_bantuan', 'sumber_program', 'nominal', 'nomor_sk',
     ];
 
     protected $casts = ['nominal' => 'decimal:2'];

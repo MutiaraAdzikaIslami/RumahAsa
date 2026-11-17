@@ -21,6 +21,7 @@ class PenyaluranBantuanTest extends TestCase
         return [
             'tanggal_bantuan' => '2026-10-05',
             'jenis_bantuan'   => 'Bantuan Stimulan',
+            'sumber_program'  => 'APBD',
             'nominal'         => 20000000,
             'nomor_sk'        => 'SK/001/2026',
         ];
@@ -33,7 +34,7 @@ class PenyaluranBantuanTest extends TestCase
         $this->actingAs($this->buatUser('verifikator'))
             ->get("/bantuan/{$rumah->id}/salurkan")
             ->assertOk()
-            ->assertSee('Catat Penyaluran Bantuan');
+            ->assertSee('Catat Bantuan');
     }
 
     public function test_penyaluran_membuat_catatan_dan_memulai_renovasi(): void
@@ -44,7 +45,11 @@ class PenyaluranBantuanTest extends TestCase
             ->post("/bantuan/{$rumah->id}/salurkan", $this->dataValid())
             ->assertRedirect(route('bantuan.index'));
 
-        $this->assertDatabaseHas('penerima_bantuan', ['rumah_id' => $rumah->id, 'nomor_sk' => 'SK/001/2026']);
+        $this->assertDatabaseHas('penerima_bantuan', [
+            'rumah_id'       => $rumah->id,
+            'nomor_sk'       => 'SK/001/2026',
+            'sumber_program' => 'APBD',
+        ]);
         $this->assertSame('Dalam Renovasi', $rumah->fresh()->status);
         $this->assertDatabaseHas('riwayat_status', ['rumah_id' => $rumah->id, 'status_ke' => 'Dalam Renovasi']);
         $this->assertDatabaseHas('audit_log', ['aksi' => 'BANTUAN_CREATE', 'entitas' => 'penerima_bantuan']);
@@ -80,7 +85,7 @@ class PenyaluranBantuanTest extends TestCase
 
         $this->actingAs($this->buatUser('verifikator'))
             ->post("/bantuan/{$rumah->id}/salurkan", [])
-            ->assertSessionHasErrors(['tanggal_bantuan', 'jenis_bantuan', 'nominal', 'nomor_sk']);
+            ->assertSessionHasErrors(['tanggal_bantuan', 'jenis_bantuan', 'sumber_program', 'nominal', 'nomor_sk']);
     }
 
     public function test_admin_dan_pimpinan_tidak_bisa_mencatat_penyaluran(): void

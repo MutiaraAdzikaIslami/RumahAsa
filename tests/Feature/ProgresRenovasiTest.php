@@ -63,8 +63,62 @@ class ProgresRenovasiTest extends TestCase
             ->delete("/bantuan/{$rumah->id}/progres/{$progres->id}")
             ->assertRedirect(route('bantuan.progres.index', $rumah));
 
-        $this->assertDatabaseMissing('progres_renovasi', ['id' => $progres->id]);
+        $this->assertSoftDeleted('progres_renovasi', ['id' => $progres->id]);
         $this->assertDatabaseHas('audit_log', ['aksi' => 'PROGRES_DELETE']);
+    }
+
+    public function test_surveyor_menambah_mengubah_dan_menghapus_progres(): void
+    {
+        $rumah   = $this->buatRumah('Dalam Renovasi');
+        $bantuan = $this->buatBantuan($rumah);
+
+        $surveyor = $this->buatUser('surveyor');
+
+        // Surveyor menambah progres (FR-22)
+        $this->actingAs($surveyor)
+            ->post("/bantuan/{$rumah->id}/progres", $this->dataProgres(35, '2026-10-12'))
+            ->assertRedirect(route('bantuan.progres.index', $rumah));
+
+        $this->assertDatabaseHas('progres_renovasi', ['persentase' => 35]);
+        $progres = \App\Models\ProgresRenovasi::where('persentase', 35)->first();
+
+        // Surveyor mengubah progres
+        $this->actingAs($surveyor)
+            ->put("/bantuan/{$rumah->id}/progres/{$progres->id}", $this->dataProgres(45, '2026-10-12'))
+            ->assertRedirect(route('bantuan.progres.index', $rumah));
+
+        $this->assertSame(45, $progres->fresh()->persentase);
+
+        // Surveyor menghapus progres (Soft delete)
+        $this->actingAs($surveyor)
+            ->delete("/bantuan/{$rumah->id}/progres/{$progres->id}")
+            ->assertRedirect(route('bantuan.progres.index', $rumah));
+
+        $this->assertSoftDeleted('progres_renovasi', ['id' => $progres->id]);
+    }
+
+    public function test_unggah_foto_progres(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake(config('rumahasa.foto_disk', 'private'));
+
+        $rumah   = $this->buatRumah('Dalam Renovasi');
+        $bantuan = $this->buatBantuan($rumah);
+
+        $foto = \Illuminate\Http\UploadedFile::fake()->image('bukti_pondasi.jpg');
+
+        $data = $this->dataProgres(30, '2026-10-11') + [
+            'foto' => [$foto],
+        ];
+
+        $this->actingAs($this->buatUser('surveyor'))
+            ->post("/bantuan/{$rumah->id}/progres", $data)
+            ->assertRedirect(route('bantuan.progres.index', $rumah));
+
+        $progres = \App\Models\ProgresRenovasi::where('persentase', 30)->first();
+        $this->assertNotNull($progres);
+        $this->assertDatabaseHas('progres_foto', [
+            'progres_renovasi_id' => $progres->id,
+        ]);
     }
 
     public function test_validasi_persentase_di_luar_rentang(): void
@@ -85,7 +139,7 @@ class ProgresRenovasiTest extends TestCase
 
         foreach (['admin', 'pimpinan'] as $role) {
             $user = $this->buatUser($role);
-            $this->actingAs($user)->get("/bantuan/{$rumah->id}/progres")->assertOk()->assertSee('Pondasi');
+            $this->actingAs($user)->get("/bantuan/{$rumah->id}/progres")->assertOk()->assertSee('Tahap uji');
             $this->actingAs($user)->post("/bantuan/{$rumah->id}/progres", $this->dataProgres())->assertForbidden();
         }
     }
