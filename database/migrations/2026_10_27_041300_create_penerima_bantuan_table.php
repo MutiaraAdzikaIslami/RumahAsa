@@ -15,11 +15,12 @@ public function up(): void
         $table->id();
         // Constraint UNIQUE: 1 rumah = 1 catatan bantuan[cite: 32]
         $table->foreignId('rumah_id')->unique()->constrained('rumah_warga')->cascadeOnDelete();
-        $table->string('status_bantuan')->nullable(); //[cite: 36]
-        $table->date('tanggal_bantuan')->nullable(); //[cite: 36]
-        $table->string('jenis_bantuan')->nullable(); //[cite: 36]
-        $table->decimal('nominal', 15, 2)->nullable(); //[cite: 36]
-        $table->string('nomor_sk')->nullable(); //[cite: 36]
+        $table->string('status_bantuan')->nullable();
+        $table->date('tanggal_bantuan')->nullable();
+        $table->string('jenis_bantuan')->nullable();
+        $table->string('sumber_program')->nullable();
+        $table->decimal('nominal', 15, 2)->nullable();
+        $table->string('nomor_sk')->nullable();
         $table->timestamps();
         });
     }
