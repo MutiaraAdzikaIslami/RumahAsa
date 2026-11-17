@@ -14,10 +14,11 @@ public function up(): void
     Schema::create('progres_renovasi', function (Blueprint $table) {
         $table->id();
         $table->foreignId('penerima_bantuan_id')->constrained('penerima_bantuan')->cascadeOnDelete(); //[cite: 32]
-        $table->string('tahap_pekerjaan'); //[cite: 36]
-        $table->integer('persentase'); //[cite: 36]
-        $table->date('tanggal_progres'); //[cite: 36]
-        $table->text('catatan')->nullable(); //[cite: 36]
+        $table->string('tahap_pekerjaan');
+        $table->integer('persentase');
+        $table->date('tanggal_progres');
+        $table->text('catatan')->nullable();
+        $table->softDeletes();
         $table->timestamps();
     });
 }

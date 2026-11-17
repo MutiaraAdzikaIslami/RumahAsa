@@ -41,6 +41,7 @@ class PenyaluranController extends Controller
         $data = $request->validate([
             'tanggal_bantuan' => 'required|date_format:Y-m-d',
             'jenis_bantuan'   => 'required|string|max:100',
+            'sumber_program'  => 'required|string|max:100',
             'nominal'         => 'required|numeric|min:0',
             'nomor_sk'        => 'required|string|max:100',
         ]);

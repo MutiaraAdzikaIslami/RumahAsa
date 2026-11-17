@@ -63,6 +63,7 @@ class BantuanContohSeeder extends Seeder
                 'status_bantuan'  => 'Disalurkan',
                 'tanggal_bantuan' => '2026-10-01',
                 'jenis_bantuan'   => 'Bantuan Stimulan Perumahan Swadaya',
+                'sumber_program'  => ($i % 2 === 0) ? 'APBD' : 'APBN',
                 'nominal'         => 20000000,
                 'nomor_sk'        => 'SK/RTLH/2026/' . str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
             ]);
