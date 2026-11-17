@@ -9,6 +9,7 @@ class RiwayatStatus extends Model
 {
     // Append-only: tidak ada updated_at / deleted_at
     public const UPDATED_AT = null;
+
     public const DELETED_AT = null;
 
     protected $table = 'riwayat_status';
@@ -17,6 +18,7 @@ class RiwayatStatus extends Model
         'rumah_id', 'user_id',
         'status_dari', 'status_ke',
         'catatan',
+        'created_at',
     ];
 
     // FIX: Karena $timestamps = false, kita harus cast manual ke datetime

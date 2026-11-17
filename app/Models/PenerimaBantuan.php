@@ -24,6 +24,7 @@ class PenerimaBantuan extends Model
         'tanggal_bantuan',
         'jenis_bantuan',
         'nominal',
+        'sumber_program',
         'nomor_sk',
     ];
 

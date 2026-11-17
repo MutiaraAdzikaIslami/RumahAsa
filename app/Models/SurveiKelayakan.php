@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class SurveiKelayakan extends Model
 {
@@ -17,7 +18,7 @@ class SurveiKelayakan extends Model
 
     protected $casts = [
         'tanggal_survei' => 'date',
-        'dikirim_at'     => 'datetime',
+        'dikirim_at' => 'datetime',
     ];
 
     public function rumah(): BelongsTo
@@ -35,6 +36,11 @@ class SurveiKelayakan extends Model
         return $this->hasMany(SurveiKomponen::class, 'survei_id');
     }
 
+    public function foto(): HasManyThrough
+    {
+        return $this->hasManyThrough(SurveiFoto::class, SurveiKomponen::class, 'survei_id', 'survei_komponen_id');
+    }
+
     /**
      * Cek apakah survei sudah lengkap untuk diajukan (UC-05)
      * - 7 komponen semua terisi opsi kondisi
@@ -45,12 +51,19 @@ class SurveiKelayakan extends Model
         $komponen = $this->komponenSurvei()->withCount(['foto as foto_count'])->get();
 
         // Harus ada 7 baris komponen, semua opsi_kondisi_id terisi, semua punya foto >= 1
-        if ($komponen->count() !== 7) return false;
+        if ($komponen->count() !== 7) {
+            return false;
+        }
 
         foreach ($komponen as $k) {
-            if ($k->opsi_kondisi_id === null) return false;
-            if ($k->foto_count < 1) return false;
+            if ($k->opsi_kondisi_id === null) {
+                return false;
+            }
+            if ($k->foto_count < 1) {
+                return false;
+            }
         }
+
         return true;
     }
 }
