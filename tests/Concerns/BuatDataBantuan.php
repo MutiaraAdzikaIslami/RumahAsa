@@ -70,6 +70,7 @@ trait BuatDataBantuan
             'status_bantuan'  => 'Disalurkan',
             'tanggal_bantuan' => $tanggal,
             'jenis_bantuan'   => 'Bantuan Stimulan',
+            'sumber_program'  => 'APBD',
             'nominal'         => 20000000,
             'nomor_sk'        => 'SK/UJI/' . $rumah->id,
         ]);
