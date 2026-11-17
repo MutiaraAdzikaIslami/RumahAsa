@@ -11,6 +11,7 @@ use App\Modules\Core\Services\FotoStorageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Gate;
 
 class SurveiFotoController extends Controller
 {
@@ -25,6 +26,8 @@ class SurveiFotoController extends Controller
      */
     public function store(Request $request, SurveiKomponen $komponen): JsonResponse
     {
+        Gate::authorize('survei', $komponen->survei->rumah);
+
         $request->validate(['file' => 'required|file']);
 
         try {
@@ -72,6 +75,8 @@ class SurveiFotoController extends Controller
      */
     public function destroy(SurveiFoto $foto): JsonResponse
     {
+        Gate::authorize('survei', $foto->surveiKomponen->survei->rumah);
+
         $this->fotoService->hapus($foto->path_file);
         
         $this->auditLogger->catat(

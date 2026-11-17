@@ -25,7 +25,7 @@
                     <p class="text-xs font-medium uppercase tracking-wide text-forest-500">Menunggu
                         Survei</p>
                     <p class="text-2xl font-bold text-amber-600">
-                        {{ \App\Models\RumahWarga::where('surveyor_id', auth()->id())->where('status', 'Menunggu Survei')->count() }}
+                        {{ \App\Models\RumahWarga::where('surveyor_id', auth()->id())->where('status', 'Menunggu Disurvei')->count() }}
                     </p>
                 </div>
                 <div class="border-l border-forest-100 pl-4">

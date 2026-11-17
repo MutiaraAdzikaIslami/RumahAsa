@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
+use App\Models\PenerimaBantuan;
+use App\Models\Penilaian;
 use App\Models\Role;
 use App\Models\RumahWarga;
 use App\Models\User;
@@ -26,7 +28,7 @@ class StatusWorkflowTest extends TestCase
         $this->workflow = app(StatusWorkflow::class);
     }
 
-    private function makeRumah(string $status = 'Menunggu Survei'): RumahWarga
+    private function makeRumah(string $status = 'Draf'): RumahWarga
     {
         $kec = Wilayah::create(['kode' => 'KEC-T', 'nama' => 'Kec Test', 'tingkat' => 'kecamatan', 'parent_id' => null]);
         $kec->update(['path' => '/' . $kec->id]);
@@ -61,7 +63,7 @@ class StatusWorkflowTest extends TestCase
 
     public function test_draf_bisa_diajukan(): void
     {
-        $rumah = $this->makeRumah('Menunggu Survei');
+        $rumah = $this->makeRumah('Draf');
         $surveyor = $this->makeUser('surveyor');
 
         $this->workflow->ajukan($rumah, $surveyor);
@@ -77,6 +79,14 @@ class StatusWorkflowTest extends TestCase
         $this->workflow->tetapkanKategori($rumah, 'layak_huni', 'Rumah layak huni', $verifikator);
 
         $this->assertSame('Layak Huni', $rumah->fresh()->status);
+        $this->assertDatabaseHas('penilaian', [
+            'rumah_id' => $rumah->id,
+            'kategori' => 'layak_huni',
+            'catatan' => 'Rumah layak huni',
+        ]);
+        $this->assertDatabaseMissing('penerima_bantuan', [
+            'rumah_id' => $rumah->id,
+        ]);
     }
 
     public function test_diajukan_bisa_ditetapkan_tidak_layak_huni(): void
@@ -87,6 +97,15 @@ class StatusWorkflowTest extends TestCase
         $this->workflow->tetapkanKategori($rumah, 'tidak_layak_huni', 'Rumah tidak layak huni', $verifikator);
 
         $this->assertSame('Penerima Bantuan', $rumah->fresh()->status);
+        $this->assertDatabaseHas('penilaian', [
+            'rumah_id' => $rumah->id,
+            'kategori' => 'tidak_layak_huni',
+            'catatan' => 'Rumah tidak layak huni',
+        ]);
+        $this->assertDatabaseHas('penerima_bantuan', [
+            'rumah_id' => $rumah->id,
+            'status_bantuan' => PenerimaBantuan::STATUS_MENUNGGU_PENYALURAN,
+        ]);
     }
 
     public function test_penerima_bantuan_bisa_mulai_renovasi(): void
@@ -133,7 +152,7 @@ class StatusWorkflowTest extends TestCase
 
     public function test_setiap_transisi_mencatat_riwayat_status_dan_audit_log(): void
     {
-        $rumah = $this->makeRumah('Menunggu Survei');
+        $rumah = $this->makeRumah('Draf');
         $surveyor = $this->makeUser('surveyor');
 
         // Gunakan DB transaction spy untuk pastikan semua query jalan
@@ -144,7 +163,7 @@ class StatusWorkflowTest extends TestCase
         // Assert riwayat_status tercatat
         $this->assertDatabaseHas('riwayat_status', [
             'rumah_id'    => $rumah->id,
-            'status_dari' => 'Menunggu Survei',
+            'status_dari' => 'Draf',
             'status_ke'   => 'Diajukan',
             'user_id'     => $surveyor->id,
         ]);
@@ -163,14 +182,32 @@ class StatusWorkflowTest extends TestCase
         $this->assertGreaterThanOrEqual(3, count($updateQueries) + count($insertQueries));
     }
 
+    public function test_menunggu_disurvei_bisa_mulai_survei_ke_draf(): void
+    {
+        $rumah = $this->makeRumah(RumahWarga::STATUS_MENUNGGU_DISURVEI);
+        $surveyor = $this->makeUser('surveyor');
+
+        $this->workflow->mulaiSurvei($rumah, $surveyor);
+
+        $this->assertSame(RumahWarga::STATUS_DRAF, $rumah->fresh()->status);
+        $this->assertDatabaseHas('riwayat_status', [
+            'rumah_id'    => $rumah->id,
+            'status_dari' => RumahWarga::STATUS_MENUNGGU_DISURVEI,
+            'status_ke'   => RumahWarga::STATUS_DRAF,
+            'user_id'     => $surveyor->id,
+        ]);
+    }
+
     public function test_can_transition_check_method(): void
     {
-        $this->assertTrue($this->workflow->canTransition('Menunggu Survei', 'Diajukan'));
+        $this->assertTrue($this->workflow->canTransition('Menunggu Disurvei', 'Draf'));
+        $this->assertTrue($this->workflow->canTransition('Menunggu Disurvei', 'Diajukan'));
+        $this->assertTrue($this->workflow->canTransition('Draf', 'Diajukan'));
         $this->assertTrue($this->workflow->canTransition('Diajukan', 'Penerima Bantuan'));
         $this->assertTrue($this->workflow->canTransition('Penerima Bantuan', 'Dalam Renovasi'));
 
-        $this->assertFalse($this->workflow->canTransition('Menunggu Survei', 'Selesai'));      // skip
-        $this->assertFalse($this->workflow->canTransition('Layak Huni', 'Menunggu Survei'));   // final
-        $this->assertFalse($this->workflow->canTransition('Selesai', 'Menunggu Survei'));      // final
+        $this->assertFalse($this->workflow->canTransition('Draf', 'Selesai'));      // skip
+        $this->assertFalse($this->workflow->canTransition('Layak Huni', 'Draf'));   // final
+        $this->assertFalse($this->workflow->canTransition('Selesai', 'Draf'));      // final
     }
 }

@@ -15,7 +15,6 @@ class RumahManagementTest extends TestCase
 
     private User $admin;
     private User $surveyor;
-    private Wilayah $kelurahan;
     private Wilayah $rt;
 
     public function setUp(): void
@@ -23,33 +22,23 @@ class RumahManagementTest extends TestCase
         parent::setUp();
         $this->seed(\Database\Seeders\RoleSeeder::class);
 
-        $prov = Wilayah::create(['kode' => '35', 'nama' => 'Jawa Timur', 'tingkat' => 'provinsi', 'parent_id' => null]);
-        $prov->update(['path' => '/' . $prov->id]);
+        // Bikin wilayah RT
+        $kec = Wilayah::create(['kode' => 'KEC-T', 'nama' => 'Kec Test', 'tingkat' => 'kecamatan', 'parent_id' => null]);
+        $kec->update(['path' => '/' . $kec->id]);
+        $this->rt = Wilayah::create(['kode' => 'RT-T', 'nama' => 'RT 01', 'tingkat' => 'rt', 'parent_id' => $kec->id]);
+        $this->rt->update(['path' => $kec->path . '/' . $this->rt->id]);
 
-        $kab = Wilayah::create(['kode' => '35.78', 'nama' => 'Kota Surabaya', 'tingkat' => 'kabupaten', 'parent_id' => $prov->id]);
-        $kab->update(['path' => $prov->path . '/' . $kab->id]);
-
-        $kec = Wilayah::create(['kode' => '35.78.01', 'nama' => 'Kec Test', 'tingkat' => 'kecamatan', 'parent_id' => $kab->id]);
-        $kec->update(['path' => $kab->path . '/' . $kec->id]);
-
-        $this->kelurahan = Wilayah::create(['kode' => '35.78.01.1001', 'nama' => 'Kel Test', 'tingkat' => 'kelurahan', 'parent_id' => $kec->id]);
-        $this->kelurahan->update(['path' => $kec->path . '/' . $this->kelurahan->id]);
-
-        $rw = Wilayah::create(['kode' => 'RW-T', 'nama' => 'RW 01', 'tingkat' => 'rw', 'parent_id' => $this->kelurahan->id]);
-        $rw->update(['path' => $this->kelurahan->path . '/' . $rw->id]);
-
-        $this->rt = Wilayah::create(['kode' => 'RT-T', 'nama' => 'RT 01', 'tingkat' => 'rt', 'parent_id' => $rw->id]);
-        $this->rt->update(['path' => $rw->path . '/' . $this->rt->id]);
-
-        $adminRole = Role::where('kode', 'admin')->first();
+        // Bikin admin (input rumah dilakukan Admin, memilih surveyor)
+        $roleAdmin = Role::where('kode', 'admin')->first();
         $this->admin = User::factory()->create([
-            'role_id'              => $adminRole->id,
+            'role_id'              => $roleAdmin->id,
             'must_change_password' => false,
         ]);
 
-        $surveyorRole = Role::where('kode', 'surveyor')->first();
+        // Bikin surveyor
+        $role = Role::where('kode', 'surveyor')->first();
         $this->surveyor = User::factory()->create([
-            'role_id'              => $surveyorRole->id,
+            'role_id'              => $role->id,
             'wilayah_id'           => $this->rt->id,
             'must_change_password' => false,
         ]);
@@ -58,66 +47,66 @@ class RumahManagementTest extends TestCase
     public function test_admin_bisa_buat_rumah_lengkap(): void
     {
         $response = $this->actingAs($this->admin)->post('/rumah', [
-            'nama_kepala_keluarga' => 'Budi Santoso',
-            'nik'                  => '1234567890123456',
-            'no_kk'                => '6543210987654321',
-            'jumlah_anggota'       => 4,
-            'status_kepemilikan'   => 'milik_sendiri',
-            'rt_text'              => '01',
-            'rw_text'              => '01',
-            'alamat'               => 'Jl. Test No. 123',
-            'wilayah_id'           => $this->kelurahan->id,
-            'surveyor_id'          => $this->surveyor->id,
+            'nama_kepala_keluarga'  => 'Budi Santoso',
+            'nik'                   => '1234567890123456',
+            'no_kk'                 => '6543210987654321',
+            'jumlah_anggota'        => 4,
+            'alamat'                => 'Jl. Test No. 123',
+            'wilayah_id'            => $this->rt->id,
+            'surveyor_id'           => $this->surveyor->id,
+            'action'                => 'save',
         ]);
 
-        $response->assertRedirect();
+        $response->assertRedirect(); // redirect ke rumah.show
         $this->assertDatabaseHas('rumah_warga', [
             'nama_kepala_keluarga' => 'Budi Santoso',
-            'status'               => 'Menunggu Survei',
+            'status'               => 'Menunggu Disurvei',
         ]);
+        $saved = RumahWarga::where('nama_kepala_keluarga', 'Budi Santoso')->first();
+        $this->assertStringStartsWith('RW-', $saved->kode_registrasi);
     }
 
     public function test_admin_bisa_simpan_draf_kosong(): void
     {
         $response = $this->actingAs($this->admin)->post('/rumah', [
+            'action'      => 'draft',
             'surveyor_id' => $this->surveyor->id,
         ]);
 
         $response->assertRedirect();
-        $response->assertSessionHasErrors(['nama_kepala_keluarga', 'nik', 'no_kk', 'wilayah_id']);
+        $this->assertDatabaseHas('rumah_warga', ['status' => 'Draf']);
     }
 
     public function test_cek_duplikat_nik_ditolak(): void
     {
+        // Bikin rumah dengan NIK tertentu secara manual (tanpa factory)
         $nikEncryptor = app(\App\Modules\Core\Services\NikEncryptor::class);
         $nik = '1111222233334444';
 
         RumahWarga::create([
-            'kode_registrasi'      => 'RUMAH-2026-9999',
+            'kode_registrasi'      => 'RW-2026-9999',
             'nama_kepala_keluarga' => 'Existing User',
             'nik_enc'              => $nikEncryptor->encryptNik($nik),
             'nik_hash'             => $nikEncryptor->hashNik($nik),
             'no_kk_enc'            => $nikEncryptor->encryptNoKk('9999888877776666'),
             'no_kk_hash'           => $nikEncryptor->hashNoKk('9999888877776666'),
             'jumlah_anggota'       => 2,
-            'status_kepemilikan'   => 'milik_sendiri',
             'alamat'               => 'Jl. Existing',
             'wilayah_id'           => $this->rt->id,
             'surveyor_id'          => $this->surveyor->id,
-            'status'               => RumahWarga::STATUS_MENUNGGU_SURVEI,
+            'status'               => RumahWarga::STATUS_DRAF,
         ]);
 
+        // Coba input rumah lagi dengan NIK yang sama
         $response = $this->actingAs($this->admin)->post('/rumah', [
-            'nama_kepala_keluarga' => 'Duplicate User',
-            'nik'                  => '1111222233334444',
-            'no_kk'                => '9999888877776666',
-            'jumlah_anggota'       => 2,
-            'status_kepemilikan'   => 'milik_sendiri',
-            'rt_text'              => '01',
-            'rw_text'              => '01',
-            'alamat'               => 'Jl. Duplicate',
-            'wilayah_id'           => $this->kelurahan->id,
-            'surveyor_id'          => $this->surveyor->id,
+            'nama_kepala_keluarga'  => 'Duplicate User',
+            'nik'                   => '1111222233334444',
+            'no_kk'                 => '9999888877776666',
+            'jumlah_anggota'        => 2,
+            'alamat'                => 'Jl. Duplicate',
+            'wilayah_id'            => $this->rt->id,
+            'surveyor_id'           => $this->surveyor->id,
+            'action'                => 'save',
         ]);
 
         $response->assertRedirect();
@@ -126,52 +115,108 @@ class RumahManagementTest extends TestCase
 
     public function test_surveyor_tidak_bisa_lihat_rumah_di_luar_wilayahnya(): void
     {
+        // Bikin wilayah lain
         $kec2 = Wilayah::create(['kode' => 'KEC-T2', 'nama' => 'Kec Test 2', 'tingkat' => 'kecamatan', 'parent_id' => null]);
         $kec2->update(['path' => '/' . $kec2->id]);
         $rt2 = Wilayah::create(['kode' => 'RT-T2', 'nama' => 'RT 02', 'tingkat' => 'rt', 'parent_id' => $kec2->id]);
         $rt2->update(['path' => $kec2->path . '/' . $rt2->id]);
 
+        // Bikin rumah di wilayah lain
         $nikEncryptor = app(\App\Modules\Core\Services\NikEncryptor::class);
         $rumahLain = RumahWarga::create([
-            'kode_registrasi'      => 'RUMAH-2026-8888',
+            'kode_registrasi'      => 'RW-2026-8888',
             'nama_kepala_keluarga' => 'User Wilayah Lain',
             'nik_enc'              => $nikEncryptor->encryptNik('1234567890123456'),
             'nik_hash'             => $nikEncryptor->hashNik('1234567890123456'),
             'no_kk_enc'            => $nikEncryptor->encryptNoKk('6543210987654321'),
             'no_kk_hash'           => $nikEncryptor->hashNoKk('6543210987654321'),
             'jumlah_anggota'       => 3,
-            'status_kepemilikan'   => 'milik_sendiri',
             'alamat'               => 'Jl. Lain',
             'wilayah_id'           => $rt2->id,
             'surveyor_id'          => $this->surveyor->id,
-            'status'               => RumahWarga::STATUS_MENUNGGU_SURVEI,
+            'status'               => RumahWarga::STATUS_DRAF,
         ]);
 
-        $this->assertFalse($this->surveyor->can('view', $rumahLain));
-
+        // Surveyor akses daftar rumah
         $response = $this->actingAs($this->surveyor)->get('/rumah');
-        $response->assertStatus(403);
+
+        // Pastikan rumah di wilayah lain TIDAK muncul
+        $response->assertDontSee($rumahLain->nama_kepala_keluarga);
     }
 
     public function test_input_rumah_mencatat_audit_log(): void
     {
         $this->actingAs($this->admin)->post('/rumah', [
-            'nama_kepala_keluarga' => 'Audit Test',
-            'nik'                  => '1234567890123456',
-            'no_kk'                => '6543210987654321',
-            'jumlah_anggota'       => 4,
-            'status_kepemilikan'   => 'milik_sendiri',
-            'rt_text'              => '01',
-            'rw_text'              => '01',
-            'alamat'               => 'Jl. Audit',
-            'wilayah_id'           => $this->kelurahan->id,
-            'surveyor_id'          => $this->surveyor->id,
+            'nama_kepala_keluarga'  => 'Audit Test',
+            'nik'                   => '1234567890123456',
+            'no_kk'                 => '6543210987654321',
+            'jumlah_anggota'        => 4,
+            'alamat'                => 'Jl. Audit',
+            'wilayah_id'            => $this->rt->id,
+            'surveyor_id'           => $this->surveyor->id,
+            'action'                => 'save',
         ]);
 
         $this->assertDatabaseHas('audit_log', [
-            'user_id' => $this->admin->id,
-            'aksi'    => 'RUMAH_CREATE',
-            'entitas' => 'rumah_warga',
+            'user_id'  => $this->admin->id,
+            'aksi'     => 'RUMAH_CREATE',
+            'entitas'  => 'rumah_warga',
         ]);
+    }
+
+    public function test_admin_bisa_edit_rumah_berstatus_menunggu_disurvei_atau_draf(): void
+    {
+        $rumah = RumahWarga::create([
+            'kode_registrasi'      => 'RW-2026-0001',
+            'nama_kepala_keluarga' => 'Budi Lama',
+            'wilayah_id'           => $this->rt->id,
+            'surveyor_id'          => $this->surveyor->id,
+            'status'               => RumahWarga::STATUS_MENUNGGU_DISURVEI,
+        ]);
+
+        // Admin buka form edit
+        $this->actingAs($this->admin)->get("/rumah/{$rumah->id}/edit")->assertOk();
+
+        // Admin update data
+        $response = $this->actingAs($this->admin)->put("/rumah/{$rumah->id}", [
+            'nama_kepala_keluarga' => 'Budi Baru',
+            'nik'                  => '3201123456789012',
+            'no_kk'                => '3201123456789012',
+            'alamat'               => 'Jl. Baru No. 10',
+            'wilayah_id'           => $this->rt->id,
+            'surveyor_id'          => $this->surveyor->id,
+            'action'               => 'save',
+        ]);
+
+        $response->assertRedirect(route('rumah.show', $rumah));
+        $this->assertSame('Budi Baru', $rumah->fresh()->nama_kepala_keluarga);
+    }
+
+    public function test_surveyor_dan_verifikator_tidak_bisa_akses_edit_rumah_ditolak_403(): void
+    {
+        $rumah = RumahWarga::create([
+            'kode_registrasi'      => 'RW-2026-0002',
+            'nama_kepala_keluarga' => 'Kepala Keluarga',
+            'wilayah_id'           => $this->rt->id,
+            'surveyor_id'          => $this->surveyor->id,
+            'status'               => RumahWarga::STATUS_DRAF,
+        ]);
+
+        $roleVerif = Role::where('kode', 'verifikator')->first();
+        $verifikator = User::factory()->create(['role_id' => $roleVerif->id, 'must_change_password' => false]);
+
+        // Surveyor coba edit
+        $this->actingAs($this->surveyor)->get("/rumah/{$rumah->id}/edit")->assertStatus(403);
+        $this->actingAs($this->surveyor)->put("/rumah/{$rumah->id}", [
+            'nama_kepala_keluarga' => 'Hacked by Surveyor',
+            'surveyor_id'          => $this->surveyor->id,
+        ])->assertStatus(403);
+
+        // Verifikator coba edit
+        $this->actingAs($verifikator)->get("/rumah/{$rumah->id}/edit")->assertStatus(403);
+        $this->actingAs($verifikator)->put("/rumah/{$rumah->id}", [
+            'nama_kepala_keluarga' => 'Hacked by Verifikator',
+            'surveyor_id'          => $this->surveyor->id,
+        ])->assertStatus(403);
     }
 }

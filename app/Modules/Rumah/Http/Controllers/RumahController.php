@@ -2,92 +2,228 @@
 
 namespace App\Modules\Rumah\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Models\RumahWarga;
-use App\Modules\Rumah\Http\Requests\StoreRumahRequest;
-use App\Modules\Rumah\Services\RumahService;
-use Illuminate\Http\RedirectResponse;
+use App\Models\User;
+use App\Models\Wilayah;
+use App\Modules\Core\Services\AuditLogger;
+use App\Modules\Core\Services\NikEncryptor;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\View\View;
+use Illuminate\Support\Facades\Gate;
 
 class RumahController extends Controller
 {
     public function __construct(
-        private readonly RumahService $rumahService,
+        private readonly AuditLogger $auditLogger,
     ) {
     }
 
-    public function index(Request $request): View
+    public function index(Request $request)
     {
         $query = RumahWarga::with(['wilayah', 'surveyor', 'survei']);
 
-        if ($search = $request->input('q')) {
-            $searchLower = strtolower($search);
-            $query->where(function ($q) use ($searchLower) {
-                $q->whereRaw('LOWER(nama_kepala_keluarga) LIKE ?', ["%{$searchLower}%"])
-                  ->orWhereRaw('LOWER(kode_registrasi) LIKE ?', ["%{$searchLower}%"])
-                  ->orWhereRaw('LOWER(alamat) LIKE ?', ["%{$searchLower}%"]);
+        // Policy: Surveyor hanya lihat wilayahnya
+        $user = auth()->user();
+        if ($user->isSurveyor() && $user->wilayah) {
+            $wilayahPath = $user->wilayah->path;
+            $query->whereHas('wilayah', function ($q) use ($wilayahPath) {
+                $q->where('path', $wilayahPath)
+                  ->orWhere('path', 'like', $wilayahPath . '/%');
             });
         }
 
-        if ($status = $request->input('status')) {
+        // FIX: Filter berdasarkan nama lokasi (kelurahan/kecamatan/dll)
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('kode_registrasi', 'like', "%{$search}%")
+                  ->orWhere('nama_kepala_keluarga', 'like', "%{$search}%")
+                  ->orWhereHas('wilayah', function ($q2) use ($search) {
+                      $q2->where('nama', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($status = $request->query('status')) {
             $query->where('status', $status);
         }
 
-        $rumah = $query->orderByDesc('id')->paginate(15)->withQueryString();
-        $statusList = RumahWarga::STATUS_LIST;
+        if ($wilayahId = $request->query('wilayah_id')) {
+            $wilayah = Wilayah::find($wilayahId);
+            if ($wilayah) {
+                $query->whereHas('wilayah', function ($q) use ($wilayah) {
+                    $q->where('id', $wilayah->id)
+                      ->orWhere('path', 'like', $wilayah->path . '/%');
+                });
+            }
+        }
 
-        return view('rumah.index', compact('rumah', 'statusList'));
+        $rumah = $query->latest()->paginate(15);
+        $wilayahList = Wilayah::orderBy('tingkat')->orderBy('nama')->get();
+
+        return view('rumah.index', compact('rumah', 'wilayahList'));
     }
 
-    public function create(): View
+    public function create()
     {
-        return view('rumah.create');
+        Gate::authorize('create', RumahWarga::class);
+
+        // Ambil semua wilayah tingkat RT & RW untuk dropdown
+        $rtList = Wilayah::whereIn('tingkat', [Wilayah::TINGKAT_RT, Wilayah::TINGKAT_RW])
+            ->with('parent')
+            ->orderBy('path')
+            ->get();
+        
+        // FIX: Ambil daftar surveyor untuk dropdown (Admin yang input, pilih surveyor)
+        $surveyorList = User::whereHas('role', function ($q) {
+            $q->where('kode', 'surveyor');
+        })->where('is_aktif', true)->orderBy('nama')->get();
+
+        return view('rumah.create', compact('rtList', 'surveyorList'));
     }
 
-    public function store(StoreRumahRequest $request): RedirectResponse
+    public function store(Request $request)
     {
-        $rumah = $this->rumahService->createRumah($request->validated());
+        Gate::authorize('create', RumahWarga::class);
 
-        return redirect()
-            ->route('rumah.show', $rumah)
-            ->with('success', "Data rumah {$rumah->kode_registrasi} berhasil disimpan. Status: Menunggu Survei.");
+        $isDraft = $request->input('action') === 'draft';
+
+        $rules = [
+            'nama_kepala_keluarga' => $isDraft ? 'nullable|string|max:150' : 'required|string|max:150',
+            'nik'                   => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
+            'no_kk'                 => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
+            'jumlah_anggota'        => 'nullable|integer|min:1',
+            'luas_rumah'            => 'nullable|numeric|min:0',
+            'pekerjaan'             => 'nullable|string|max:100',
+            'penghasilan'           => 'nullable|integer|min:0',
+            'status_kepemilikan'    => 'nullable|in:milik_sendiri,sewa,menumpang,lainnya',
+            'alamat'                => $isDraft ? 'nullable|string' : 'required|string',
+            'latitude'              => 'nullable|numeric',
+            'longitude'             => 'nullable|numeric',
+            'wilayah_id'            => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
+            // FIX: surveyor_id wajib diisi oleh Admin
+            'surveyor_id'           => 'required|exists:users,id',
+        ];
+
+        $validated = $request->validate($rules, [
+            'nik.size' => 'NIK harus 16 digit.',
+            'no_kk.size' => 'No. KK harus 16 digit.',
+        ]);
+
+        $nikEncryptor = app(NikEncryptor::class);
+        if (!empty($validated['nik'])) {
+            $nikHash = $nikEncryptor->hashNik($validated['nik']);
+            $exists = RumahWarga::where('nik_hash', $nikHash)->exists();
+            if ($exists) {
+                return back()->withErrors(['nik' => 'NIK sudah terdaftar di sistem.'])->withInput();
+            }
+            $validated['nik_enc'] = $nikEncryptor->encryptNik($validated['nik']);
+            $validated['nik_hash'] = $nikHash;
+        }
+        if (!empty($validated['no_kk'])) {
+            $validated['no_kk_enc'] = $nikEncryptor->encryptNoKk($validated['no_kk']);
+            $validated['no_kk_hash'] = $nikEncryptor->hashNoKk($validated['no_kk']);
+        }
+        unset($validated['nik'], $validated['no_kk']);
+
+        $count = RumahWarga::withTrashed()->count() + 1;
+        $validated['kode_registrasi'] = 'RW-' . date('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+        // FIX: surveyor_id diambil dari input Admin, bukan auth()->id()
+        $validated['status'] = $isDraft ? RumahWarga::STATUS_DRAF : RumahWarga::STATUS_MENUNGGU_DISURVEI;
+
+        $rumah = RumahWarga::create($validated);
+
+        $this->auditLogger->catat(
+            aksi:      AuditLog::AKSI['RUMAH_CREATE'],
+            entitas:   'rumah_warga',
+            entitasId: $rumah->id,
+            dataBaru:  ['kode_registrasi' => $rumah->kode_registrasi],
+        );
+
+        return redirect()->route('rumah.show', $rumah)
+            ->with('success', $isDraft ? 'Draf berhasil disimpan.' : 'Data rumah berhasil disimpan.');
     }
 
-    public function show(RumahWarga $rumah): View
+    public function show(RumahWarga $rumah)
     {
-        $rumah->load(['wilayah.parent.parent.parent.parent', 'surveyor', 'survei', 'riwayatStatus.user']);
+        $rumah->load(['wilayah', 'surveyor', 'survei.komponenSurvei.komponen', 'survei.komponenSurvei.opsiKondisi', 'survei.komponenSurvei.foto', 'riwayatStatus']);
         return view('rumah.show', compact('rumah'));
     }
 
-    public function edit(RumahWarga $rumah): RedirectResponse|View
+    public function edit(RumahWarga $rumah)
     {
-        if (!$rumah->bisaDieditOlehAdmin()) {
-            return redirect()
-                ->route('rumah.show', $rumah)
-                ->with('error', "Data rumah tidak bisa diedit karena sudah dalam proses survei (status: {$rumah->status}).");
-        }
+        Gate::authorize('update', $rumah);
 
-        return view('rumah.create', ['rumah' => $rumah]);
+        $rtList = Wilayah::whereIn('tingkat', [Wilayah::TINGKAT_RT, Wilayah::TINGKAT_RW])
+            ->with('parent')
+            ->orderBy('path')
+            ->get();
+        $surveyorList = User::whereHas('role', function ($q) {
+            $q->where('kode', 'surveyor');
+        })->where('is_aktif', true)->orderBy('nama')->get();
+
+        $nikEncryptor = app(NikEncryptor::class);
+        $nikPlain = $rumah->nik_enc ? $nikEncryptor->decryptNik($rumah->nik_enc) : '';
+        $noKkPlain = $rumah->no_kk_enc ? $nikEncryptor->decryptNoKk($rumah->no_kk_enc) : '';
+
+        return view('rumah.edit', compact('rumah', 'rtList', 'surveyorList', 'nikPlain', 'noKkPlain'));
     }
 
-    public function update(StoreRumahRequest $request, RumahWarga $rumah): RedirectResponse
+    public function update(Request $request, RumahWarga $rumah)
     {
-        $this->rumahService->updateRumah($rumah, $request->validated());
+        Gate::authorize('update', $rumah);
 
-        return redirect()
-            ->route('rumah.show', $rumah)
-            ->with('success', "Data rumah {$rumah->kode_registrasi} berhasil diperbarui.");
-    }
+        $isDraft = $request->input('action') === 'draft';
 
-    public function destroy(RumahWarga $rumah): RedirectResponse
-    {
-        try {
-            $this->rumahService->deleteRumah($rumah);
-            return redirect()->route('rumah.index')
-                ->with('success', "Rumah {$rumah->kode_registrasi} telah dihapus.");
-        } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+        $rules = [
+            'nama_kepala_keluarga' => $isDraft ? 'nullable|string|max:150' : 'required|string|max:150',
+            'nik'                   => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
+            'no_kk'                 => $isDraft ? 'nullable|string|size:16' : 'required|string|size:16',
+            'jumlah_anggota'        => 'nullable|integer|min:1',
+            'luas_rumah'            => 'nullable|numeric|min:0',
+            'pekerjaan'             => 'nullable|string|max:100',
+            'penghasilan'           => 'nullable|integer|min:0',
+            'status_kepemilikan'    => 'nullable|in:milik_sendiri,sewa,menumpang,lainnya',
+            'alamat'                => $isDraft ? 'nullable|string' : 'required|string',
+            'latitude'              => 'nullable|numeric',
+            'longitude'             => 'nullable|numeric',
+            'wilayah_id'            => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
+            'surveyor_id'           => 'required|exists:users,id',
+        ];
+
+        $validated = $request->validate($rules);
+
+        $nikEncryptor = app(NikEncryptor::class);
+        if (!empty($validated['nik'])) {
+            $nikHash = $nikEncryptor->hashNik($validated['nik']);
+            $exists = RumahWarga::where('nik_hash', $nikHash)
+                ->where('id', '!=', $rumah->id)
+                ->exists();
+            if ($exists) {
+                return back()->withErrors(['nik' => 'NIK sudah terdaftar di rumah lain.'])->withInput();
+            }
+            $validated['nik_enc'] = $nikEncryptor->encryptNik($validated['nik']);
+            $validated['nik_hash'] = $nikHash;
         }
+        if (!empty($validated['no_kk'])) {
+            $validated['no_kk_enc'] = $nikEncryptor->encryptNoKk($validated['no_kk']);
+            $validated['no_kk_hash'] = $nikEncryptor->hashNoKk($validated['no_kk']);
+        }
+        unset($validated['nik'], $validated['no_kk']);
+
+        $dataLama = $rumah->only(['nama_kepala_keluarga', 'wilayah_id', 'surveyor_id', 'status']);
+        $rumah->update($validated);
+        $dataBaru = $rumah->only(['nama_kepala_keluarga', 'wilayah_id', 'surveyor_id', 'status']);
+
+        $this->auditLogger->catat(
+            aksi:      AuditLog::AKSI['RUMAH_UPDATE'],
+            entitas:   'rumah_warga',
+            entitasId: $rumah->id,
+            dataBaru:  $dataBaru,
+            dataLama:  $dataLama,
+        );
+
+        return redirect()->route('rumah.show', $rumah)
+            ->with('success', 'Data rumah berhasil diperbarui.');
     }
 }

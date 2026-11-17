@@ -1,136 +1,174 @@
 @extends('layouts.app')
 
-@section('title_suffix', ' - Survei Kelayakan')
-@section('header', 'Survei Kelayakan')
+@section('title', 'Survei Kelayakan')
 
 @section('content')
-    <div class="mx-auto max-w-3xl space-y-6">
-        @include('partials.flash')
+<form action="{{ route('survei.update', [$rumah, $survei]) }}" method="POST">
+    @csrf
+    @method('PUT')
 
-        <div class="rounded-2xl border border-forest-100 bg-white p-5 shadow-sm">
-            <div class="flex items-center gap-4">
-                <div class="grid h-12 w-12 place-items-center rounded-xl bg-forest-700 text-cream-50">
-                    <i data-lucide="home" class="h-6 w-6"></i>
-                </div>
-                <div class="flex-1">
-                    <div class="flex items-center gap-3">
-                        <h2 class="text-xl font-bold text-forest-900">{{ $rumah->kode_registrasi }}</h2>
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $rumah->badgeColorClass() }}">
-                            {{ $rumah->status }}
-                        </span>
-                    </div>
-                    <p class="mt-1 text-sm text-forest-600">
-                        {{ $rumah->nama_kepala_keluarga }} &middot; {{ $rumah->wilayah?->nama ?? '-' }}
-                        &middot; {{ $rumah->alamat }}
-                    </p>
-                </div>
-            </div>
+    <div class="space-y-4 max-w-4xl">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-slate-900">Survei Kelayakan</h1>
+            <a href="{{ route('rumah.show', $rumah) }}" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg">Kembali</a>
         </div>
 
-        <form method="POST" action="{{ route('survei.store', $rumah) }}" enctype="multipart/form-data" class="space-y-5">
-            @csrf
+        @if (session('success'))
+            <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-sm text-emerald-700">{{ session('success') }}</div>
+        @endif
 
-            @if ($errors->any())
-                <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="alert-circle" class="h-4 w-4"></i>
-                        <span class="font-semibold">Ada kesalahan input:</span>
-                    </div>
-                    <ul class="mt-2 list-disc pl-8 text-xs">
-                        @foreach ($errors->all() as $err)
-                            <li>{{ $err }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            <div class="rounded-2xl border border-forest-100 bg-white p-6 shadow-sm">
-                <label for="tanggal_survei" class="block text-sm font-semibold text-forest-900">
-                    Tanggal Survei <span class="text-red-500">*</span>
-                </label>
-                <input
-                    id="tanggal_survei"
-                    name="tanggal_survei"
-                    type="date"
-                    required
-                    value="{{ old('tanggal_survei', now()->format('Y-m-d')) }}"
-                    max="{{ now()->format('Y-m-d') }}"
-                    class="mt-1.5 block w-full rounded-lg border border-forest-100 bg-white px-3.5 py-2.5 text-sm text-forest-900 focus:border-forest-400 focus:outline-none focus:ring-2 focus:ring-forest-400/30 sm:max-w-xs"
-                >
+        @if ($errors->any())
+            <div class="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                @foreach ($errors->all() as $error)
+                    <p>{{ $error }}</p>
+                @endforeach
             </div>
+        @endif
 
-            @foreach ($komponenList as $komponen)
-                <div class="rounded-2xl border border-forest-100 bg-white p-6 shadow-sm">
-                    <div class="mb-4">
-                        <h3 class="text-sm font-bold text-forest-900">{{ $komponen->urutan }}. {{ $komponen->nama }}</h3>
-                        @if ($komponen->deskripsi)
-                            <p class="mt-0.5 text-xs text-forest-500">{{ $komponen->deskripsi }}</p>
-                        @endif
+        {{-- 7 Komponen --}}
+        @foreach ($komponenList as $komponen)
+            @php
+                $surveiKomponen = $survei->komponenSurvei->where('komponen_id', $komponen->id)->first();
+            @endphp
+            <div class="bg-white rounded-lg shadow p-6" x-data="{ open: {{ $loop->first ? 'true' : 'false' }} }">
+                <div class="flex items-center justify-between cursor-pointer" @click="open = !open">
+                    <h2 class="text-lg font-semibold text-slate-900">
+                        <span class="text-slate-400 mr-2">{{ $loop->iteration }}.</span>
+                        {{ $komponen->nama }}
+                    </h2>
+                    <svg class="w-5 h-5 text-slate-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                </div>
+
+                <div x-show="open" x-cloak class="mt-4 space-y-4 border-t pt-4">
+                    <p class="text-xs text-slate-500">{{ $komponen->deskripsi }}</p>
+
+                    {{-- Opsi Kondisi --}}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Pilih Kondisi:</label>
+                        <div class="space-y-2">
+                            @foreach ($komponen->opsiKondisi as $opsi)
+                                <label class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50 {{ $surveiKomponen->opsi_kondisi_id == $opsi->id ? 'border-emerald-500 bg-emerald-50' : '' }}">
+                                    <input type="radio" name="komponen[{{ $komponen->id }}][opsi_kondisi_id]" value="{{ $opsi->id }}" {{ $surveiKomponen->opsi_kondisi_id == $opsi->id ? 'checked' : '' }} class="mt-1 text-emerald-600 focus:ring-emerald-500">
+                                    <div>
+                                        <span class="font-medium text-sm text-slate-900">{{ $opsi->label }}</span>
+                                        @if ($opsi->otomatis_rtlh)
+                                            <span class="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">RTLH</span>
+                                        @endif
+                                        <p class="text-xs text-slate-500 mt-1">{{ $opsi->deskripsi }}</p>
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
                     </div>
 
-                    <div class="space-y-2">
-                        @php
-                            $opsiList = $komponen->opsiKondisi->sortBy('urutan');
-                            $selectedOpsi = old("kondisi.{$komponen->id}");
-                        @endphp
+                    {{-- Catatan --}}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Catatan</label>
+                        <textarea name="komponen[{{ $komponen->id }}][catatan]" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Catatan tambahan...">{{ $surveiKomponen->catatan ?? '' }}</textarea>
+                    </div>
 
-                        @foreach ($opsiList as $opsi)
-                            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-forest-50 p-3 transition hover:border-forest-300 hover:bg-cream-50">
-                                <input
-                                    type="radio"
-                                    name="kondisi[{{ $komponen->id }}]"
-                                    value="{{ $opsi->id }}"
-                                    id="komp-{{ $komponen->id }}-opsi-{{ $opsi->id }}"
-                                    @checked($selectedOpsi == $opsi->id)
-                                    class="mt-0.5 h-4 w-4 border-forest-300 text-forest-600 focus:ring-forest-500"
-                                >
-                                <div class="flex-1">
-                                    <span class="text-sm font-medium text-forest-900">{{ $opsi->label }}</span>
-                                    @if ($opsi->otomatis_rtlh)
-                                        <span class="ml-2 inline-flex rounded-full bg-clay-100 px-2 py-0.5 text-xs font-semibold text-clay-600">Otomatis RTLH</span>
-                                    @endif
-                                    @if ($opsi->deskripsi)
-                                        <p class="mt-0.5 text-xs text-forest-500">{{ $opsi->deskripsi }}</p>
-                                    @endif
+                    {{-- Upload Foto (FR-11b) --}}
+                    <div x-data="fotoUploader({{ $surveiKomponen->id }})">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Foto Bukti</label>
+                        
+                        <div class="grid grid-cols-3 gap-2 mb-3" id="foto-grid-{{ $surveiKomponen->id }}">
+                            @foreach ($surveiKomponen->foto as $foto)
+                                <div class="relative group">
+                                    <img src="{{ route('survei.foto.show', $foto) }}" class="w-full h-24 object-cover rounded-lg border">
+                                    <button type="button" onclick="hapusFoto(this, {{ $foto->id }})" class="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">×</button>
                                 </div>
+                            @endforeach
+                        </div>
+
+                        <div class="flex items-center justify-center w-full" @drop.prevent="handleDrop($event, {{ $surveiKomponen->id }})" @dragover.prevent>
+                            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 border-slate-300">
+                                <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <svg class="w-6 h-6 mb-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                                    <p class="text-xs text-slate-500"><span class="font-medium">Klik untuk upload</span> atau drag & drop</p>
+                                </div>
+                                <input type="file" class="hidden" accept="image/jpeg,image/png,image/webp" @change="handleUpload($event.target.files, {{ $surveiKomponen->id }})">
                             </label>
-                        @endforeach
-
-                        @if ($opsiList->isEmpty())
-                            <p class="text-xs text-red-500">Belum ada opsi nilai untuk komponen ini. Hubungi admin.</p>
-                        @endif
-                    </div>
-
-                    {{-- === UPLOAD FOTO BUKTI === --}}
-                    <div class="mt-4 border-t border-forest-50 pt-4">
-                        <label class="block text-sm font-semibold text-forest-900 mb-1">
-                            <i data-lucide="camera" class="inline-block h-4 w-4 mr-1"></i>
-                            Foto Bukti (Opsional, maks. 5 foto, masing-masing 5MB)
-                        </label>
-                        <p class="text-xs text-forest-500 mb-2">Format: JPG, PNG, atau WebP</p>
-                        <input
-                            type="file"
-                            name="foto[{{ $komponen->id }}][]"
-                            multiple
-                            accept="image/jpeg,image/png,image/webp"
-                            class="block w-full text-sm text-forest-700 file:mr-3 file:rounded-lg file:border-0 file:bg-forest-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-forest-700 hover:file:bg-forest-100"
-                        >
-                        @error("foto.{$komponen->id}") <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                        </div>
+                        <p x-show="uploading" class="text-xs text-blue-500 mt-1">Uploading...</p>
                     </div>
                 </div>
-            @endforeach
-
-            <div class="flex items-center justify-between rounded-2xl border border-forest-100 bg-white p-5 shadow-sm">
-                <a href="{{ route('survei.index') }}" class="text-sm font-medium text-forest-600 hover:underline">Batal</a>
-                <button
-                    type="submit"
-                    class="inline-flex items-center gap-2 rounded-lg bg-forest-700 px-6 py-2.5 text-sm font-semibold text-cream-50 shadow-sm hover:bg-forest-800"
-                    onclick="return confirm('Kirim survei ini? Setelah dikirim, status rumah akan menjadi DIAJUKAN dan tidak bisa diedit lagi kecuali diminta revisi oleh verifikator.');"
-                >
-                    <i data-lucide="send" class="h-4 w-4"></i>
-                    Kirim Survei
-                </button>
             </div>
-        </form>
+        @endforeach
+
+        {{-- Tombol Aksi --}}
+        <div class="flex justify-between pt-4 border-t bg-white sticky bottom-0 p-4 rounded-lg shadow">
+            <a href="{{ route('rumah.show', $rumah) }}" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Batal</a>
+            <div class="space-x-2">
+                <button type="submit" name="action" value="draft" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg">Simpan Draf</button>
+                <button type="submit" name="action" value="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Kirim Survei</button>
+            </div>
+        </div>
     </div>
+</form>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+<script>
+function fotoUploader(komponenId) {
+    return {
+        uploading: false,
+        
+        async handleUpload(files, compId) {
+            if (!files.length) return;
+            this.uploading = true;
+            
+            const formData = new FormData();
+            formData.append('file', files[0]);
+
+            try {
+                const res = await fetch(`/survei/survei-komponen/${compId}/foto`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const grid = document.getElementById(`foto-grid-${compId}`);
+                    const div = document.createElement('div');
+                    div.className = 'relative group';
+                    div.innerHTML = `
+                        <img src="${data.url}" class="w-full h-24 object-cover rounded-lg border">
+                        <button type="button" onclick="hapusFoto(this, ${data.foto.id})" class="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition">×</button>
+                    `;
+                    grid.appendChild(div);
+                } else {
+                    const err = await res.json();
+                    alert('Gagal upload: ' + (err.message || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                this.uploading = false;
+            }
+        },
+
+        handleDrop(e, compId) {
+            this.handleUpload(e.dataTransfer.files, compId);
+        }
+    };
+}
+
+window.hapusFoto = async function(el, fotoId) {
+    if (!confirm('Hapus foto ini?')) return;
+    const res = await fetch(`/survei/survei-foto/${fotoId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json'
+        }
+    });
+    if (res.ok) {
+        el.closest('.relative').remove();
+    }
+};
+</script>
 @endsection

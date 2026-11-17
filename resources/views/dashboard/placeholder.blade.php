@@ -133,7 +133,7 @@
                     <p class="text-xs font-medium uppercase tracking-wide text-forest-500">Menunggu
                         Survei</p>
                     <p class="text-2xl font-bold text-forest-900">
-                        {{ \App\Models\RumahWarga::where('status', 'Menunggu Survei')->count() }}</p>
+                        {{ \App\Models\RumahWarga::where('status', 'Menunggu Disurvei')->count() }}</p>
                     <p class="text-xs text-forest-500">Menunggu surveyor</p>
                 </div>
             </div>
@@ -173,10 +173,10 @@
                     @php
                         $statuses = [
                             [
-                                'label' => 'Menunggu Survei',
+                                'label' => 'Menunggu Disurvei',
                                 'value' => \App\Models\RumahWarga::where(
                                     'status',
-                                    'Menunggu Survei',
+                                    'Menunggu Disurvei',
                                 )->count(),
                                 'color' => '#9CA3AF',
                             ],

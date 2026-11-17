@@ -45,7 +45,7 @@ class RumahService
                 'longitude'            => $data['longitude'] ?? null,
                 'wilayah_id'           => $wilayahRt->id,
                 'surveyor_id'          => (int) $data['surveyor_id'],
-                'status'               => RumahWarga::STATUS_MENUNGGU_SURVEI,
+                'status'               => RumahWarga::STATUS_MENUNGGU_DISURVEI,
             ];
 
             $rumah = RumahWarga::create($payload);

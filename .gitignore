@@ -17,6 +17,9 @@ yarn-error.log
 /.vscode
 /.fleet
 /.nova
+/.claude
+/.mcp.json
+/boost.json
 /storage/app/private/*
 !storage/app/private/.gitkeep
 

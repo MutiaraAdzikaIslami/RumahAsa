@@ -212,41 +212,90 @@ class RumahPolicyTest extends TestCase
     }
 
     // =========================================================================
-    // AC-05: Surveyor mengubah data wilayah tugasnya -> Sesuai kewenangan
+    // AC-05: Hak akses update data rumah (hanya Admin)
     // =========================================================================
 
-    public function test_ac05_surveyor_mengubah_data_wilayah_tugasnya_berstatus_draf_diizinkan(): void
+    public function test_admin_mengubah_data_berstatus_menunggu_disurvei_diizinkan(): void
+    {
+        $rt = $this->getWilayahRt();
+        $surveyor = $this->getUser('surveyor', $rt);
+        $admin = $this->getUser('admin');
+        $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_MENUNGGU_DISURVEI);
+
+        $this->assertTrue($admin->can('update', $rumah));
+    }
+
+    public function test_admin_mengubah_data_berstatus_draf_diizinkan(): void
+    {
+        $rt = $this->getWilayahRt();
+        $surveyor = $this->getUser('surveyor', $rt);
+        $admin = $this->getUser('admin');
+        $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_DRAF);
+
+        $this->assertTrue($admin->can('update', $rumah));
+    }
+
+    public function test_admin_mengubah_data_yang_sudah_diajukan_ditolak(): void
+    {
+        $rt = $this->getWilayahRt();
+        $surveyor = $this->getUser('surveyor', $rt);
+        $admin = $this->getUser('admin');
+        $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_DIAJUKAN);
+
+        $this->assertFalse($admin->can('update', $rumah));
+    }
+
+    public function test_surveyor_mengubah_data_rumah_ditolak(): void
     {
         $rt = $this->getWilayahRt();
         $surveyor = $this->getUser('surveyor', $rt);
         $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_DRAF);
 
-        $this->assertTrue($surveyor->can('update', $rumah));
+        $this->assertFalse($surveyor->can('update', $rumah));
     }
 
-    public function test_ac05_surveyor_mengubah_data_wilayah_tugasnya_berstatus_perlu_perbaikan_diizinkan(): void
+    public function test_verifikator_mengubah_data_rumah_ditolak(): void
+    {
+        $rt = $this->getWilayahRt();
+        $surveyor = $this->getUser('surveyor', $rt);
+        $verifikator = $this->getUser('verifikator');
+        $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_DRAF);
+
+        $this->assertFalse($verifikator->can('update', $rumah));
+    }
+
+    // =========================================================================
+    // Hak akses mengisi survei (hanya Surveyor pada wilayah tugasnya)
+    // =========================================================================
+
+    public function test_surveyor_mengisi_survei_wilayah_tugasnya_status_menunggu_disurvei_diizinkan(): void
+    {
+        $rt = $this->getWilayahRt();
+        $surveyor = $this->getUser('surveyor', $rt);
+        $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_MENUNGGU_DISURVEI);
+
+        $this->assertTrue($surveyor->can('survei', $rumah));
+    }
+
+    public function test_surveyor_mengisi_survei_wilayah_tugasnya_status_draf_diizinkan(): void
+    {
+        $rt = $this->getWilayahRt();
+        $surveyor = $this->getUser('surveyor', $rt);
+        $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_DRAF);
+
+        $this->assertTrue($surveyor->can('survei', $rumah));
+    }
+
+    public function test_surveyor_mengisi_survei_wilayah_tugasnya_status_perlu_perbaikan_diizinkan(): void
     {
         $rt = $this->getWilayahRt();
         $surveyor = $this->getUser('surveyor', $rt);
         $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_PERLU_PERBAIKAN);
 
-        $this->assertTrue($surveyor->can('update', $rumah));
+        $this->assertTrue($surveyor->can('survei', $rumah));
     }
 
-    public function test_ac05_surveyor_mengubah_data_yang_sudah_diajukan_ditolak(): void
-    {
-        $rt = $this->getWilayahRt();
-        $surveyor = $this->getUser('surveyor', $rt);
-        $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_DIAJUKAN);
-
-        $this->assertFalse($surveyor->can('update', $rumah));
-    }
-
-    // =========================================================================
-    // AC-06: Surveyor mengubah data wilayah lain -> Ditolak
-    // =========================================================================
-
-    public function test_ac06_surveyor_mengubah_data_wilayah_lain_ditolak(): void
+    public function test_surveyor_mengisi_survei_wilayah_lain_ditolak(): void
     {
         $rt1 = $this->getWilayahRt();
         $rt2 = $this->getWilayahRtLain();
@@ -254,7 +303,28 @@ class RumahPolicyTest extends TestCase
         $surveyor = $this->getUser('surveyor', $rt1);
         $rumahLain = $this->getRumah($rt2, $surveyor, RumahWarga::STATUS_DRAF);
 
-        $this->assertFalse($surveyor->can('update', $rumahLain));
+        $this->assertFalse($surveyor->can('survei', $rumahLain));
+    }
+
+    public function test_surveyor_tanpa_wilayah_tidak_bisa_survei(): void
+    {
+        $rt = $this->getWilayahRt();
+        $surveyorTanpaWilayah = $this->getUser('surveyor', null);
+        $rumah = $this->getRumah($rt, $surveyorTanpaWilayah, RumahWarga::STATUS_DRAF);
+
+        $this->assertFalse($surveyorTanpaWilayah->can('survei', $rumah));
+    }
+
+    public function test_admin_dan_verifikator_tidak_bisa_mengisi_survei(): void
+    {
+        $rt = $this->getWilayahRt();
+        $surveyor = $this->getUser('surveyor', $rt);
+        $admin = $this->getUser('admin');
+        $verifikator = $this->getUser('verifikator');
+        $rumah = $this->getRumah($rt, $surveyor, RumahWarga::STATUS_DRAF);
+
+        $this->assertFalse($admin->can('survei', $rumah));
+        $this->assertFalse($verifikator->can('survei', $rumah));
     }
 
     // =========================================================================

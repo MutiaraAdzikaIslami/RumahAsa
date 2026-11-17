@@ -66,11 +66,13 @@
             <h2 class="text-lg font-semibold text-slate-900 mb-3 pb-2 border-b">Data Rumah</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Wilayah RT</label>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Wilayah (RT / RW)</label>
                     <select name="wilayah_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-                        <option value="">Pilih RT...</option>
+                        <option value="">Pilih Wilayah (RT / RW)...</option>
                         @foreach ($rtList as $rt)
-                            <option value="{{ $rt->id }}" {{ old('wilayah_id', $rumah->wilayah_id) == $rt->id ? 'selected' : '' }}>{{ $rt->nama }} ({{ $rt->kode }})</option>
+                            <option value="{{ $rt->id }}" {{ old('wilayah_id', $rumah->wilayah_id) == $rt->id ? 'selected' : '' }}>
+                                [{{ strtoupper($rt->tingkat) }}] {{ $rt->parent ? $rt->parent->nama . ' - ' : '' }}{{ $rt->nama }} ({{ $rt->kode }})
+                            </option>
                         @endforeach
                     </select>
                 </div>
