@@ -46,7 +46,7 @@ Route::middleware('auth')->group(function () {
             // FR-05 & FR-06: User Management & Hydrate Endpoints
             Route::get('users/form-data', [UserFormDataController::class, 'index'])->name('users.form-data');
             Route::get('users/roles',     [RoleController::class, 'index'])->name('users.roles');
-            Route::resource('users', UserController::class)->except(['show']);
+            Route::resource('users', UserController::class);
             Route::match(['put', 'post'], 'users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
             Route::match(['put', 'patch'], 'users/{user}/toggle-aktif',   [UserController::class, 'toggleAktif'])->name('users.toggle-aktif');
             Route::post('users/restore',                                  [UserController::class, 'restore'])->name('users.restore');

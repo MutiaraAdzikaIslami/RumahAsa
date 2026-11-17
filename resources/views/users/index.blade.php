@@ -129,6 +129,12 @@
                                         <i data-lucide="pencil" class="h-3.5 w-3.5"></i>
                                     </a>
                                     @if ($u->id !== auth()->id())
+                                        <form method="POST" action="{{ route('users.reset-password', $u) }}" onsubmit="return confirm('Reset password untuk user {{ $u->nama }}?')" class="inline">
+                                            @csrf
+                                            <button type="submit" class="inline-flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50" title="Reset Password">
+                                                <i data-lucide="key-round" class="h-3.5 w-3.5"></i>
+                                            </button>
+                                        </form>
                                         <form method="POST" action="{{ route('users.destroy', $u) }}" onsubmit="return confirm('Hapus user ini?')" class="inline">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50" title="Hapus">
@@ -164,4 +170,90 @@
         @endif
     </div>
 </div>
+
+{{-- Pop-Up Modal Password Sementara (Create & Reset Password) --}}
+@if (session('generated_password'))
+<div id="modal-generated-password" class="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/60 p-4 backdrop-blur-xs">
+    <div class="w-full max-w-md overflow-hidden rounded-2xl border border-forest-100 bg-white shadow-2xl">
+        <div class="border-b border-forest-100 bg-forest-700 px-6 py-4 text-cream-50">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="key-round" class="h-5 w-5 text-gold-400"></i>
+                    <h3 class="text-base font-bold">Password Sementara User</h3>
+                </div>
+                <button type="button" onclick="document.getElementById('modal-generated-password').remove()" class="rounded-lg p-1 text-cream-100 hover:bg-forest-800" title="Tutup">
+                    <i data-lucide="x" class="h-4 w-4"></i>
+                </button>
+            </div>
+            <p class="mt-1 text-xs text-cream-100/90">Simpan atau salin kredensial ini sekarang. Password hanya ditampilkan satu kali.</p>
+        </div>
+
+        <div class="space-y-4 px-6 py-5">
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-forest-500">Username</label>
+                <div class="mt-1 rounded-lg border border-forest-100 bg-cream-50 px-3.5 py-2.5">
+                    <code id="gen-username" class="text-sm font-bold text-forest-900 select-all">{{ session('generated_username') }}</code>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-forest-500">Password Sementara</label>
+                <div class="mt-1 flex items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50/70 px-3.5 py-2.5">
+                    <code id="gen-password" class="font-mono text-base font-bold tracking-wider text-forest-900 select-all">{{ session('generated_password') }}</code>
+                    <button type="button" id="btn-copy-password"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-forest-700 px-3 py-1.5 text-xs font-semibold text-cream-50 hover:bg-forest-800">
+                        <i data-lucide="copy" class="h-3.5 w-3.5"></i>
+                        <span id="copy-label">Salin</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800">
+                <i data-lucide="alert-triangle" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"></i>
+                <span>Sampaikan password ini kepada user. User wajib mengganti password saat login pertama kali.</span>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end border-t border-forest-100 bg-cream-50/60 px-6 py-3.5">
+            <button type="button" onclick="document.getElementById('modal-generated-password').remove()"
+                    class="rounded-lg bg-forest-700 px-5 py-2 text-sm font-semibold text-cream-50 hover:bg-forest-800">
+                Saya Sudah Menyimpannya
+            </button>
+        </div>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+(function() {
+    const copyBtn = document.getElementById('btn-copy-password');
+    const passEl = document.getElementById('gen-password');
+    const labelEl = document.getElementById('copy-label');
+    if (!copyBtn || !passEl) return;
+
+    copyBtn.addEventListener('click', async function() {
+        const text = passEl.textContent.trim();
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+            }
+            if (labelEl) labelEl.textContent = 'Tersalin!';
+            setTimeout(() => { if (labelEl) labelEl.textContent = 'Salin'; }, 2000);
+        } catch (err) {
+            console.error('Gagal menyalin password:', err);
+        }
+    });
+})();
+</script>
+@endpush
+@endif
 @endsection

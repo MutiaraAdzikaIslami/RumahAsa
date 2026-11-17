@@ -77,9 +77,9 @@
                         <label for="role_id" class="block text-sm font-semibold text-forest-900">Role <span class="text-red-500">*</span></label>
                         <select id="role_id" name="role_id" required
                                 class="mt-1.5 block w-full rounded-lg border border-forest-100 bg-white px-3.5 py-2.5 text-sm text-forest-900 focus:border-forest-400 focus:outline-none focus:ring-2 focus:ring-forest-400/30">
-                            <option value="">Pilih role</option>
+                            <option value="" data-kode="">Pilih role</option>
                             @foreach ($roles as $r)
-                                <option value="{{ $r['id'] }}" @selected(old('role_id', $user?->role_id) == $r['id'])>{{ $r['nama'] }}</option>
+                                <option value="{{ $r['id'] }}" data-kode="{{ $r['kode'] }}" @selected(old('role_id', $user?->role_id) == $r['id'])>{{ $r['nama'] }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -98,7 +98,7 @@
             {{-- ===== Section: Wilayah Tugas (cascading) ===== --}}
             <div class="border-t border-forest-100 pt-5" id="section-wilayah">
                 <h3 class="text-xs font-semibold uppercase tracking-wider text-gold-600">Wilayah Tugas</h3>
-                <p class="text-xs text-forest-500">Pilih hierarki wilayah tugas (untuk Surveyor & Verifikator). Admin & Pimpinan boleh kosong (akses semua wilayah).</p>
+                <p class="text-xs text-forest-500">Wajib diisi khusus untuk role Surveyor. Role Admin, Verifikator, dan Pimpinan tidak memiliki wilayah tugas (akses semua wilayah).</p>
 
                 <div class="mt-3 grid gap-4 sm:grid-cols-3">
                     {{-- Kabupaten/Kota --}}
@@ -184,9 +184,12 @@
 @push('scripts')
 <script>
 (function() {
+    const roleSelect = document.getElementById('role_id');
     const kabSelect = document.getElementById('kabupaten_id');
     const kecSelect = document.getElementById('kecamatan_id');
     const kelSelect = document.getElementById('wilayah_id');
+    const rtInput = document.getElementById('rt_text');
+    const rwInput = document.getElementById('rw_text');
 
     if (!kabSelect || !kecSelect || !kelSelect) return;
 
@@ -219,6 +222,35 @@
         selectEl.disabled = true;
         selectEl.classList.add('bg-forest-50', 'text-forest-400');
         selectEl.classList.remove('bg-white', 'text-forest-900');
+    }
+
+    function syncWilayahByRole() {
+        if (!roleSelect) return;
+        const selectedOpt = roleSelect.options[roleSelect.selectedIndex];
+        const kode = selectedOpt ? (selectedOpt.dataset.kode || '') : '';
+        const isSurveyor = kode === 'surveyor';
+
+        kabSelect.disabled = !isSurveyor;
+        if (rtInput) rtInput.disabled = !isSurveyor;
+        if (rwInput) rwInput.disabled = !isSurveyor;
+
+        if (!isSurveyor) {
+            kabSelect.value = '';
+            kabSelect.classList.add('bg-forest-50', 'text-forest-400');
+            kabSelect.classList.remove('bg-white', 'text-forest-900');
+            resetSelect(kecSelect, 'Pilih kecamatan');
+            resetSelect(kelSelect, 'Pilih kelurahan');
+            if (rtInput) rtInput.value = '';
+            if (rwInput) rwInput.value = '';
+        } else {
+            kabSelect.classList.remove('bg-forest-50', 'text-forest-400');
+            kabSelect.classList.add('bg-white', 'text-forest-900');
+        }
+    }
+
+    if (roleSelect) {
+        roleSelect.addEventListener('change', syncWilayahByRole);
+        syncWilayahByRole();
     }
 
     kabSelect.addEventListener('change', async function() {

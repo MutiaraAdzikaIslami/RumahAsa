@@ -24,7 +24,7 @@ class UserController extends Controller
         private readonly AuditLogger $auditLogger,
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): View|JsonResponse
     {
         $query = User::with(['role', 'wilayah']);
 
@@ -42,9 +42,23 @@ class UserController extends Controller
         }
 
         $users = $query->orderBy('id')->paginate(15)->withQueryString();
+
+        if ($request->wantsJson()) {
+            return response()->json($users);
+        }
+
         $roles = collect($this->userService->listRoles());
 
         return view('users.index', compact('users', 'roles'));
+    }
+
+    public function show(Request $request, User $user): JsonResponse|RedirectResponse
+    {
+        if ($request->wantsJson()) {
+            return response()->json($user->load(['role', 'wilayah']));
+        }
+
+        return redirect()->route('users.edit', $user);
     }
 
     public function create(): View
@@ -65,7 +79,7 @@ class UserController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'message'            => "User '{$result['user']->nama}' berhasil dibuat.",
-                'user'               => $result['user'],
+                'user'               => $result['user']->load(['role', 'wilayah']),
                 'password_sementara' => $result['password_plaintext'],
             ], 201);
         }
@@ -98,7 +112,7 @@ class UserController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'message' => "User '{$updated->nama}' berhasil diperbarui.",
-                'user'    => $updated,
+                'user'    => $updated->load(['role', 'wilayah']),
             ]);
         }
 
@@ -150,7 +164,7 @@ class UserController extends Controller
         }
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => "User '{$user->nama}' berhasil dipulihkan.", 'user' => $user]);
+            return response()->json(['message' => "User '{$user->nama}' berhasil dipulihkan.", 'user' => $user->load(['role', 'wilayah'])]);
         }
 
         return redirect()
@@ -172,7 +186,7 @@ class UserController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'message'            => "Password user '{$user->nama}' telah di-reset.",
-                'user'               => $result['user'],
+                'user'               => $result['user']->load(['role', 'wilayah']),
                 'password_sementara' => $result['password_plaintext'],
             ]);
         }
@@ -193,13 +207,19 @@ class UserController extends Controller
                 : back()->with('error', $msg);
         }
 
-        $updated = $this->userService->toggleAktif($user);
+        try {
+            $updated = $this->userService->toggleAktif($user);
+        } catch (\RuntimeException $e) {
+            return $request->wantsJson()
+                ? response()->json(['message' => $e->getMessage()], 422)
+                : back()->with('error', $e->getMessage());
+        }
 
         if ($request->wantsJson()) {
             return response()->json([
                 'message'  => "Status aktif user '{$updated->nama}' diubah.",
                 'is_aktif' => $updated->is_aktif,
-                'user'     => $updated,
+                'user'     => $updated->load(['role', 'wilayah']),
             ]);
         }
 

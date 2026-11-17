@@ -4,10 +4,9 @@ namespace App\Modules\Users\Http\Requests;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Models\Wilayah;
+use App\Modules\Core\Rules\AlphanumericPassword;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -18,39 +17,45 @@ class UpdateUserRequest extends FormRequest
 
     public function rules(): array
     {
-        $userId = $this->route('user') instanceof User
-            ? $this->route('user')->id
-            : (int) $this->route('user');
+        $userId = $this->route('user')->id ?? $this->route('user');
 
         return [
-            'role_id'    => ['required', 'integer', Rule::exists(Role::class, 'id')],
-            'wilayah_id' => ['nullable', 'integer', Rule::exists(Wilayah::class, 'id')],
             'nama'       => ['required', 'string', 'max:150'],
-            'username'   => [
-                'required', 'string', 'min:3', 'max:50',
-                'regex:/^[A-Za-z0-9._-]+$/',
-                Rule::unique(User::class, 'username')->ignore($userId),
-            ],
-            'email'    => ['nullable', 'string', 'email:rfc', 'max:100', Rule::unique(User::class, 'email')->ignore($userId)],
-            'is_aktif' => ['boolean'],
+            'username'   => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($userId)],
+            'email'      => ['nullable', 'email', 'max:100', Rule::unique('users', 'email')->ignore($userId)],
+            'role_id'    => ['required', 'exists:roles,id'],
+            'wilayah_id' => ['nullable', 'exists:wilayah,id'],
+            'password'   => ['nullable', 'string', new AlphanumericPassword()],
+            'is_aktif'   => ['boolean'],
         ];
     }
 
-    public function withValidator(Validator $validator): void
+    public function withValidator($validator): void
     {
-        $validator->after(function (Validator $validator) {
-            $role = Role::find($this->input('role_id'));
-            if (! $role) {
+        $validator->after(function ($validator) {
+            if ($validator->errors()->isNotEmpty()) {
                 return;
             }
 
-            $wilayahId = $this->input('wilayah_id');
-            if ($role->kode === 'surveyor' && empty($wilayahId)) {
-                $validator->errors()->add('wilayah_id', 'Surveyor wajib memiliki wilayah tugas.');
+            $role = Role::find($this->input('role_id'));
+            if (!$role) {
+                return;
             }
 
-            if ($role->kode !== 'surveyor' && ! empty($wilayahId)) {
-                $validator->errors()->add('wilayah_id', 'Role selain surveyor tidak boleh memiliki wilayah tugas.');
+            $routeUser = $this->route('user');
+            $effectiveWilayahId = $this->exists('wilayah_id')
+                ? $this->input('wilayah_id')
+                : ($routeUser instanceof User ? $routeUser->wilayah_id : null);
+
+            if ($role->kode === 'surveyor') {
+                if (empty($effectiveWilayahId)) {
+                    $validator->errors()->add('wilayah_id', 'Surveyor wajib memiliki wilayah tugas.');
+                }
+            } elseif (!empty($effectiveWilayahId)) {
+                $validator->errors()->add(
+                    'wilayah_id',
+                    "Role {$role->nama} tidak boleh memiliki wilayah tugas (lihat semua wilayah)."
+                );
             }
         });
     }
@@ -58,27 +63,14 @@ class UpdateUserRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'role_id.required'  => 'Role wajib dipilih.',
             'nama.required'     => 'Nama wajib diisi.',
             'username.required' => 'Username wajib diisi.',
-            'username.min'      => 'Username minimal 3 karakter.',
-            'username.regex'    => 'Username hanya boleh berisi huruf, angka, titik (.), dash (-), underscore (_). Tidak boleh spasi atau simbol lain.',
             'username.unique'   => 'Username sudah dipakai user lain.',
             'email.email'       => 'Format email tidak valid.',
             'email.unique'      => 'Email sudah dipakai user lain.',
+            'role_id.required'  => 'Role wajib dipilih.',
+            'role_id.exists'    => 'Role tidak ditemukan.',
+            'wilayah_id.exists' => 'Wilayah tidak ditemukan.',
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        if ($this->has('username')) {
-            $this->merge(['username' => strtolower(trim((string) $this->input('username')))]);
-        }
-        if ($this->has('email') && $this->filled('email')) {
-            $this->merge(['email' => strtolower(trim((string) $this->input('email')))]);
-        }
-        if ($this->has('nama')) {
-            $this->merge(['nama' => trim((string) $this->input('nama'))]);
-        }
     }
 }
