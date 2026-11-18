@@ -1,9 +1,52 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@source "../views/**/*.blade.php";
+@source "../../app/**/*.php";
 
-body {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+@theme {
+    --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+
+    --color-forest: #1D4034;
+    --color-forest-light: #2A5244;
+    --color-forest-dark: #152C23;
+    --color-forest-accent: #3E6B5A;
+    --color-forest-50: #EEF5F1;
+    --color-forest-100: #D6E6DE;
+    --color-forest-200: #B0CEBF;
+    --color-forest-300: #84B19C;
+    --color-forest-400: #589378;
+    --color-forest-500: #3B785D;
+    --color-forest-600: #2D604A;
+    --color-forest-700: #244E3C;
+    --color-forest-800: #1D4034;
+    --color-forest-900: #152E25;
+    --color-forest-950: #0C1C16;
+
+    --color-cream: #F5F3EE;
+    --color-cream-light: #FFFFFF;
+    --color-cream-dark: #E6E2D8;
+    --color-cream-50: #FAF9F6;
+    --color-cream-100: #F2EFE8;
+    --color-cream-200: #E6E2D8;
+
+    --color-terracotta: #E8B87D;
+    --color-terracotta-light: #F0C99A;
+
+    --color-gold-400: #E8B87D;
+    --color-gold-500: #D49A55;
+    --color-gold-600: #B87A35;
+
+    --color-clay-100: #F7EFE5;
+    --color-clay-600: #9A5B25;
+}
+
+@layer base {
+    body {
+        font-family: var(--font-sans);
+    }
+}
+
+[x-cloak] {
+    display: none !important;
 }

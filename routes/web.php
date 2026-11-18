@@ -50,7 +50,7 @@ Route::middleware(['auth', 'must.change.pwd'])->group(function () {
 
     // scrum-14: Kelola User (FR-05) — admin only
     Route::middleware('role:manage-users')->prefix('users')->name('users.')->group(function () {
-        Route::get('/view', fn () => view('users.index'))->name('view');
+        Route::get('/view', [\App\Modules\Users\Http\Controllers\UserController::class, 'index'])->name('view');
         require __DIR__.'/../app/Modules/Users/routes.php';
     });
 

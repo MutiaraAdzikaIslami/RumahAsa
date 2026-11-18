@@ -17,35 +17,43 @@ class StoreRumahRequest extends FormRequest
         return true;
     }
 
+    public function isDraftSubmission(): bool
+    {
+        return $this->input('action') === 'draft';
+    }
+
     public function rules(): array
     {
-        $isUpdate = in_array($this->method(), ['PUT', 'PATCH'], true);
+        $isDraft   = $this->isDraftSubmission();
+        $isUpdate  = in_array($this->method(), ['PUT', 'PATCH'], true);
         $nikDigits = ['string', 'size:16', 'regex:/^[0-9]{16}$/'];
 
         return [
-            'nama_kepala_keluarga' => ['required', 'string', 'max:150'],
-            'nik'                  => $isUpdate
+            'nama_kepala_keluarga' => [$isDraft ? 'nullable' : 'required', 'string', 'max:150'],
+            'nik'                  => ($isDraft || $isUpdate)
                 ? array_merge(['nullable'], $nikDigits)
                 : array_merge(['required'], $nikDigits),
-            'no_kk'                => $isUpdate
+            'no_kk'                => ($isDraft || $isUpdate)
                 ? array_merge(['nullable'], $nikDigits)
                 : array_merge(['required'], $nikDigits),
-            'jumlah_anggota'       => ['required', 'integer', 'min:1', 'max:99'],
+            'jumlah_anggota'       => [$isDraft ? 'nullable' : 'required', 'integer', 'min:1', 'max:99'],
             'luas_rumah'           => ['nullable', 'numeric', 'min:0', 'max:99999.99'],
             'pekerjaan'            => ['nullable', 'string', 'max:100'],
-            'penghasilan'          => ['nullable', 'integer', 'min:0', 'max:9999999999'],
-            'status_kepemilikan'   => ['required', Rule::in(['milik_sendiri', 'sewa', 'menumpang', 'lainnya'])],
-            'rt_text'              => ['required', 'string', 'max:10', 'regex:/^[A-Za-z0-9\/\-\.]+$/'],
-            'rw_text'              => ['required', 'string', 'max:10', 'regex:/^[A-Za-z0-9\/\-\.]+$/'],
+            'penghasilan'          => ['nullable', 'integer', 'min:0', 'max:999999999999'],
+            'status_kepemilikan'   => [$isDraft ? 'nullable' : 'required', Rule::in(['milik_sendiri', 'sewa', 'menumpang', 'lainnya'])],
+            'rw_text'              => [$isDraft ? 'nullable' : 'required', 'string', 'max:10', 'regex:/^[A-Za-z0-9\/\-\.]+$/'],
+            'rt_text'              => [$isDraft ? 'nullable' : 'required', 'string', 'max:10', 'regex:/^[A-Za-z0-9\/\-\.]+$/'],
             'wilayah_id'           => [
-                'required', 'integer',
+                $isDraft ? 'nullable' : 'required',
+                'integer',
                 Rule::exists(Wilayah::class, 'id')->where('tingkat', Wilayah::TINGKAT_KELURAHAN),
             ],
-            'alamat'               => ['required', 'string', 'max:500'],
+            'alamat'               => [$isDraft ? 'nullable' : 'required', 'string', 'max:500'],
             'latitude'             => ['nullable', 'numeric', 'between:-90,90'],
             'longitude'            => ['nullable', 'numeric', 'between:-180,180'],
             'surveyor_id'          => [
-                'required', 'integer',
+                'required',
+                'integer',
                 Rule::exists(User::class, 'id'),
             ],
         ];
@@ -62,9 +70,9 @@ class StoreRumahRequest extends FormRequest
             }
 
             if ($this->filled('nik') && preg_match('/^[0-9]{16}$/', (string) $this->input('nik'))) {
-                $nikHash = app(NikEncryptor::class)->hashNik((string) $this->input('nik'));
+                $nikHash    = app(NikEncryptor::class)->hashNik((string) $this->input('nik'));
                 $routeRumah = $this->route('rumah');
-                $ignoreId = $routeRumah instanceof RumahWarga
+                $ignoreId   = $routeRumah instanceof RumahWarga
                     ? $routeRumah->id
                     : (is_numeric($routeRumah) ? (int) $routeRumah : null);
 
@@ -93,11 +101,11 @@ class StoreRumahRequest extends FormRequest
             'jumlah_anggota.required'       => 'Jumlah anggota keluarga wajib diisi.',
             'penghasilan.integer'           => 'Penghasilan harus berupa angka.',
             'status_kepemilikan.required'   => 'Status kepemilikan wajib dipilih.',
-            'rt_text.required'              => 'RT wajib diisi.',
-            'rt_text.regex'                 => 'RT hanya boleh berisi huruf, angka, slash, dash, titik.',
             'rw_text.required'              => 'RW wajib diisi.',
             'rw_text.regex'                 => 'RW hanya boleh berisi huruf, angka, slash, dash, titik.',
-            'wilayah_id.required'           => 'Wilayah (Kelurahan/Desa) wajib dipilih.',
+            'rt_text.required'              => 'RT wajib diisi.',
+            'rt_text.regex'                 => 'RT hanya boleh berisi huruf, angka, slash, dash, titik.',
+            'wilayah_id.required'           => 'Kelurahan/Desa wajib dipilih.',
             'wilayah_id.exists'             => 'Wilayah tidak valid. Pastikan memilih sampai tingkat Kelurahan/Desa.',
             'alamat.required'               => 'Alamat wajib diisi.',
             'surveyor_id.required'          => 'Surveyor wajib ditugaskan.',
@@ -107,17 +115,22 @@ class StoreRumahRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->has('penghasilan') && $this->filled('penghasilan')) {
-            $raw   = (string) $this->input('penghasilan');
+        if ($this->has('penghasilan')) {
+            $raw   = (string) $this->input('penghasilan', '');
             $clean = preg_replace('/[^0-9]/', '', $raw);
             $this->merge(['penghasilan' => $clean !== '' ? (int) $clean : null]);
         }
 
         if ($this->has('rt_text')) {
-            $this->merge(['rt_text' => trim((string) $this->input('rt_text'))]);
+            $rt = trim((string) $this->input('rt_text'));
+            $this->merge(['rt_text' => $rt !== '' ? $rt : null]);
         }
         if ($this->has('rw_text')) {
-            $this->merge(['rw_text' => trim((string) $this->input('rw_text'))]);
+            $rw = trim((string) $this->input('rw_text'));
+            $this->merge(['rw_text' => $rw !== '' ? $rw : null]);
+        }
+        if ($this->has('wilayah_id') && $this->input('wilayah_id') === '') {
+            $this->merge(['wilayah_id' => null]);
         }
     }
 }

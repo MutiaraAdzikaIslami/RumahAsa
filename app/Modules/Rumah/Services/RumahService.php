@@ -17,35 +17,45 @@ class RumahService
     ) {
     }
 
-    public function createRumah(array $data): RumahWarga
+    public function createRumah(array $data, bool $isDraft = false): RumahWarga
     {
-        return DB::transaction(function () use ($data) {
-            $wilayahRt = $this->resolveOrCreateRtWilayah(
-                parentWilayahId: (int) $data['wilayah_id'],
-                rtText: $data['rt_text'],
-                rwText: $data['rw_text'],
-            );
+        return DB::transaction(function () use ($data, $isDraft) {
+            $wilayahId = null;
+            if (!empty($data['wilayah_id'])) {
+                if (!empty($data['rt_text']) && !empty($data['rw_text'])) {
+                    $wilayahRt = $this->resolveOrCreateRtWilayah(
+                        parentWilayahId: (int) $data['wilayah_id'],
+                        rtText: $data['rt_text'],
+                        rwText: $data['rw_text'],
+                    );
+                    $wilayahId = $wilayahRt->id;
+                } else {
+                    $wilayahId = (int) $data['wilayah_id'];
+                }
+            }
 
             $kode = $this->generateKodeRegistrasi();
 
             $payload = [
                 'kode_registrasi'      => $kode,
-                'nama_kepala_keluarga' => trim($data['nama_kepala_keluarga']),
-                'nik_enc'              => $this->nikEncryptor->encryptNik($data['nik']),
-                'nik_hash'             => $this->nikEncryptor->hashNik($data['nik']),
-                'no_kk_enc'            => $this->nikEncryptor->encryptNoKk($data['no_kk']),
-                'no_kk_hash'           => $this->nikEncryptor->hashNoKk($data['no_kk']),
-                'jumlah_anggota'       => (int) $data['jumlah_anggota'],
+                'nama_kepala_keluarga' => isset($data['nama_kepala_keluarga']) && $data['nama_kepala_keluarga'] !== ''
+                    ? trim((string) $data['nama_kepala_keluarga'])
+                    : null,
+                'nik_enc'              => !empty($data['nik']) ? $this->nikEncryptor->encryptNik($data['nik']) : null,
+                'nik_hash'             => !empty($data['nik']) ? $this->nikEncryptor->hashNik($data['nik']) : null,
+                'no_kk_enc'            => !empty($data['no_kk']) ? $this->nikEncryptor->encryptNoKk($data['no_kk']) : null,
+                'no_kk_hash'           => !empty($data['no_kk']) ? $this->nikEncryptor->hashNoKk($data['no_kk']) : null,
+                'jumlah_anggota'       => isset($data['jumlah_anggota']) && $data['jumlah_anggota'] !== '' ? (int) $data['jumlah_anggota'] : null,
                 'luas_rumah'           => $data['luas_rumah'] ?? null,
                 'pekerjaan'            => $data['pekerjaan'] ?? null,
                 'penghasilan'          => $data['penghasilan'] ?? null,
-                'status_kepemilikan'   => $data['status_kepemilikan'],
-                'alamat'               => trim($data['alamat']),
+                'status_kepemilikan'   => $data['status_kepemilikan'] ?? null,
+                'alamat'               => isset($data['alamat']) && $data['alamat'] !== '' ? trim((string) $data['alamat']) : null,
                 'latitude'             => $data['latitude'] ?? null,
                 'longitude'            => $data['longitude'] ?? null,
-                'wilayah_id'           => $wilayahRt->id,
+                'wilayah_id'           => $wilayahId,
                 'surveyor_id'          => (int) $data['surveyor_id'],
-                'status'               => RumahWarga::STATUS_MENUNGGU_DISURVEI,
+                'status'               => $isDraft ? RumahWarga::STATUS_DRAF : RumahWarga::STATUS_MENUNGGU_DISURVEI,
             ];
 
             $rumah = RumahWarga::create($payload);
@@ -72,7 +82,7 @@ class RumahService
         $year  = now()->year;
         $count = RumahWarga::withTrashed()->whereYear('created_at', $year)->count();
         $seq   = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
-        return "RUMAH-{$year}-{$seq}";
+        return "RW-{$year}-{$seq}";
     }
 
     public function resolveOrCreateRtWilayah(int $parentWilayahId, string $rtText, string $rwText): Wilayah
@@ -119,7 +129,7 @@ class RumahService
         return $rt->fresh();
     }
 
-    public function updateRumah(RumahWarga $rumah, array $data): RumahWarga
+    public function updateRumah(RumahWarga $rumah, array $data, bool $isDraft = false): RumahWarga
     {
         if (!$rumah->bisaDieditOlehAdmin()) {
             throw new \RuntimeException(
@@ -127,29 +137,41 @@ class RumahService
             );
         }
 
-        $dataLama = $rumah->only(['nama_kepala_keluarga', 'jumlah_anggota', 'penghasilan', 'alamat', 'wilayah_id']);
+        $dataLama = $rumah->only(['nama_kepala_keluarga', 'jumlah_anggota', 'penghasilan', 'alamat', 'wilayah_id', 'status']);
 
-        DB::transaction(function () use ($rumah, $data) {
+        DB::transaction(function () use ($rumah, $data, $isDraft) {
+            $nextStatus = $rumah->status;
+            if (!$isDraft && $rumah->status === RumahWarga::STATUS_DRAF) {
+                $nextStatus = RumahWarga::STATUS_MENUNGGU_DISURVEI;
+            }
+
             $rumah->forceFill([
-                'nama_kepala_keluarga' => trim($data['nama_kepala_keluarga']),
-                'jumlah_anggota'       => (int) $data['jumlah_anggota'],
+                'nama_kepala_keluarga' => isset($data['nama_kepala_keluarga']) && $data['nama_kepala_keluarga'] !== ''
+                    ? trim((string) $data['nama_kepala_keluarga'])
+                    : null,
+                'jumlah_anggota'       => isset($data['jumlah_anggota']) && $data['jumlah_anggota'] !== '' ? (int) $data['jumlah_anggota'] : null,
                 'luas_rumah'           => $data['luas_rumah'] ?? null,
                 'pekerjaan'            => $data['pekerjaan'] ?? null,
                 'penghasilan'          => $data['penghasilan'] ?? null,
-                'status_kepemilikan'   => $data['status_kepemilikan'],
-                'alamat'               => trim($data['alamat']),
+                'status_kepemilikan'   => $data['status_kepemilikan'] ?? null,
+                'alamat'               => isset($data['alamat']) && $data['alamat'] !== '' ? trim((string) $data['alamat']) : null,
                 'latitude'             => $data['latitude'] ?? null,
                 'longitude'            => $data['longitude'] ?? null,
                 'surveyor_id'          => (int) $data['surveyor_id'],
+                'status'               => $nextStatus,
             ])->save();
 
-            if (!empty($data['wilayah_id']) && !empty($data['rw_text']) && !empty($data['rt_text'])) {
-                $wilayahRt = $this->resolveOrCreateRtWilayah(
-                    parentWilayahId: (int) $data['wilayah_id'],
-                    rtText: $data['rt_text'],
-                    rwText: $data['rw_text'],
-                );
-                $rumah->forceFill(['wilayah_id' => $wilayahRt->id])->save();
+            if (!empty($data['wilayah_id'])) {
+                if (!empty($data['rw_text']) && !empty($data['rt_text'])) {
+                    $wilayahRt = $this->resolveOrCreateRtWilayah(
+                        parentWilayahId: (int) $data['wilayah_id'],
+                        rtText: $data['rt_text'],
+                        rwText: $data['rw_text'],
+                    );
+                    $rumah->forceFill(['wilayah_id' => $wilayahRt->id])->save();
+                } else {
+                    $rumah->forceFill(['wilayah_id' => (int) $data['wilayah_id']])->save();
+                }
             }
 
             if (!empty($data['nik'])) {
@@ -169,7 +191,7 @@ class RumahService
                 aksi:      AuditLog::AKSI['RUMAH_UPDATE'],
                 entitas:   'rumah_warga',
                 entitasId: $rumah->id,
-                dataBaru:  $rumah->fresh()->only(['nama_kepala_keluarga', 'penghasilan', 'alamat', 'wilayah_id']),
+                dataBaru:  $rumah->fresh()->only(['nama_kepala_keluarga', 'penghasilan', 'alamat', 'wilayah_id', 'status']),
                 dataLama:  $dataLama,
             );
         });

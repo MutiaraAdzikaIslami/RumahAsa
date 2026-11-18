@@ -84,7 +84,7 @@
             </div>
             <div>
                 <p class="text-slate-500 text-xs">Penghasilan</p>
-                <p>{{ $rumah->penghasilan ? 'Rp ' . number_format($rumah->penghasilan) : '-' }}</p>
+                <p>{{ $rumah->penghasilan ? 'Rp ' . number_format($rumah->penghasilan, 0, ',', '.') : '-' }}</p>
             </div>
             <div>
                 <p class="text-slate-500 text-xs">Status Kepemilikan</p>
@@ -101,9 +101,19 @@
     <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-slate-900 mb-4">Lokasi</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            @php
+                $wilayahChain = [];
+                $currWilayah = $rumah->wilayah;
+                while ($currWilayah) {
+                    if ($currWilayah->tingkat !== 'provinsi') {
+                        $wilayahChain[] = $currWilayah->nama;
+                    }
+                    $currWilayah = $currWilayah->parent;
+                }
+            @endphp
             <div>
                 <p class="text-slate-500 text-xs">Wilayah</p>
-                <p class="font-medium">{{ $rumah->wilayah?->nama ?? '-' }}</p>
+                <p class="font-medium">{{ count($wilayahChain) ? implode(', ', $wilayahChain) : '-' }}</p>
             </div>
             <div>
                 <p class="text-slate-500 text-xs">Alamat</p>

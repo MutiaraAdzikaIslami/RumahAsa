@@ -13,58 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        forest: {
-                            DEFAULT: '#1D4034',
-                            light: '#2A5244',
-                            dark: '#152C23',
-                            accent: '#3E6B5A',
-                            50: '#EEF5F1',
-                            100: '#D6E6DE',
-                            200: '#B0CEBF',
-                            300: '#84B19C',
-                            400: '#589378',
-                            500: '#3B785D',
-                            600: '#2D604A',
-                            700: '#244E3C',
-                            800: '#1D4034',
-                            900: '#152E25',
-                            950: '#0C1C16',
-                        },
-                        cream: {
-                            DEFAULT: '#F5F3EE',
-                            light: '#FFFFFF',
-                            dark: '#E6E2D8',
-                            50: '#FAF9F6',
-                            100: '#F2EFE8',
-                            200: '#E6E2D8',
-                        },
-                        terracotta: {
-                            DEFAULT: '#E8B87D',
-                            light: '#F0C99A',
-                        },
-                        gold: {
-                            400: '#E8B87D',
-                            500: '#D49A55',
-                            600: '#B87A35',
-                        },
-                        clay: {
-                            100: '#F7EFE5',
-                            600: '#9A5B25',
-                        },
-                    },
-                    fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
+    @vite(['resources/css/app.css'])
 
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
