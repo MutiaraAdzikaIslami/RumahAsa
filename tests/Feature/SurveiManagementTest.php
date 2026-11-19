@@ -127,4 +127,16 @@ class SurveiManagementTest extends TestCase
         $response->assertSessionHasErrors();
         $this->assertSame('Draf', $this->rumah->fresh()->status);
     }
+
+    public function test_admin_tidak_bisa_akses_atau_isi_survei(): void
+    {
+        $roleAdmin = Role::where('kode', 'admin')->first();
+        $admin = User::factory()->create([
+            'role_id'              => $roleAdmin->id,
+            'must_change_password' => false,
+        ]);
+
+        $response = $this->actingAs($admin)->get("/survei/rumah/{$this->rumah->id}/survei");
+        $response->assertStatus(403);
+    }
 }

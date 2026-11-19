@@ -123,9 +123,12 @@
     <div class="bg-white rounded-lg shadow p-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-slate-900">Survei Kelayakan</h2>
-            @if ($rumah->bisaDiedit())
-                <a href="{{ route('survei.create', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Isi Survei</a>
-            @endif
+            {{-- RBAC: Hanya Surveyor yang boleh mengisi survei (bukan Admin!) --}}
+            @can('surveyor')
+                @if ($rumah->bisaDiedit())
+                    <a href="{{ route('survei.create', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Isi Survei</a>
+                @endif
+            @endcan
         </div>
         @if ($rumah->survei->isEmpty())
             <p class="text-slate-500 text-sm">Belum ada survei.</p>

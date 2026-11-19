@@ -158,4 +158,17 @@ class RumahManagementTest extends TestCase
             'entitas'  => 'rumah_warga',
         ]);
     }
+
+    public function test_non_admin_tidak_bisa_input_rumah(): void
+    {
+        $response = $this->actingAs($this->surveyor)->get('/rumah/create');
+        $response->assertStatus(403);
+
+        $responsePost = $this->actingAs($this->surveyor)->post('/rumah', [
+            'nama_kepala_keluarga' => 'Non Admin User',
+            'wilayah_id'           => $this->rt->id,
+            'action'               => 'draft',
+        ]);
+        $responsePost->assertStatus(403);
+    }
 }
