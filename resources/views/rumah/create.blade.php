@@ -66,15 +66,61 @@
                     <label class="block text-sm font-medium text-slate-700 mb-1">Luas Rumah (m²)</label>
                     <input type="number" name="luas_rumah" value="{{ old('luas_rumah') }}" step="0.01" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Mis. 36.50">
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Wilayah RT <span class="text-red-500">*</span></label>
-                    <select name="wilayah_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-                        <option value="">Pilih RT...</option>
-                        @foreach ($rtList as $rt)
-                            <option value="{{ $rt->id }}" {{ old('wilayah_id') == $rt->id ? 'selected' : '' }}>{{ $rt->nama }} ({{ $rt->kode }})</option>
-                        @endforeach
-                    </select>
+
+                {{-- Cascading Wilayah: Kabupaten/Kota -> Kecamatan -> Kelurahan -> RT --}}
+                <div x-data="wilayahCascade(@json($kabupatenList), @json($kecamatanDirect), {{ old('wilayah_id') ?? 'null' }}, @json($selectedWilayah))" class="md:col-span-2 space-y-3">
+                    <p class="text-sm font-medium text-slate-700">Wilayah Administratif <span class="text-red-500">*</span></p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {{-- Kabupaten / Kota --}}
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Kabupaten/Kota <span class="text-red-500">*</span></label>
+                            <select x-model="selectedKabupaten" @change="loadKecamatan()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                                <option value="">Pilih Kabupaten/Kota...</option>
+                                <template x-for="k in kabupatenList" :key="k.id">
+                                    <option :value="k.id" x-text="k.nama"></option>
+                                </template>
+                            </select>
+                        </div>
+                        {{-- Kecamatan --}}
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Kecamatan <span class="text-red-500">*</span></label>
+                            <select x-model="selectedKecamatan" @change="loadKelurahan()" :disabled="!selectedKabupaten && kecamatanList.length === 0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm disabled:bg-slate-100">
+                                <option value="">Pilih Kecamatan...</option>
+                                <template x-for="k in kecamatanList" :key="k.id">
+                                    <option :value="k.id" x-text="k.nama"></option>
+                                </template>
+                            </select>
+                        </div>
+                        {{-- Kelurahan / Desa --}}
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Kelurahan/Desa <span class="text-red-500">*</span></label>
+                            <select x-model="selectedKelurahan" @change="loadRt()" :disabled="!selectedKecamatan" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm disabled:bg-slate-100">
+                                <option value="">Pilih Kelurahan...</option>
+                                <template x-for="k in kelurahanList" :key="k.id">
+                                    <option :value="k.id" x-text="k.nama"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
+                    {{-- RT / RW pilihan (jika terdaftar di database) --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3" x-show="rtList.length > 0">
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Pilih RT (jika terdaftar di sistem)</label>
+                            <select x-model="selectedRt" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                                <option value="">Gunakan Kelurahan di atas (atau pilih RT)</option>
+                                <template x-for="r in rtList" :key="r.id">
+                                    <option :value="r.id" x-text="r.nama + ' (' + r.kode + ')'"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
+                    {{-- Hidden input yang dikirim ke controller sebagai wilayah_id --}}
+                    <input type="hidden" name="wilayah_id" :value="effectiveWilayahId">
+                    <p class="text-xs text-slate-400">Hierarki: Kabupaten/Kota &rarr; Kecamatan &rarr; Kelurahan/Desa &rarr; RT.</p>
                 </div>
+
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-slate-700 mb-1">Alamat <span class="text-red-500">*</span></label>
                     <textarea name="alamat" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Alamat lengkap">{{ old('alamat') }}</textarea>
@@ -163,6 +209,148 @@ function rumahForm() {
                 { enableHighAccuracy: true, timeout: 10000 }
             );
         },
+    };
+}
+
+function wilayahCascade(kabupatenList, kecamatanDirect, initialWilayahId, selectedWilayah) {
+    return {
+        kabupatenList: kabupatenList || [],
+        kecamatanDirect: kecamatanDirect || [],
+        kecamatanList: [],
+        kelurahanList: [],
+        rtList: [],
+
+        selectedKabupaten: '',
+        selectedKecamatan: '',
+        selectedKelurahan: '',
+        selectedRt: '',
+
+        loadingKecamatan: false,
+        loadingKelurahan: false,
+        loadingRt: false,
+
+        async init() {
+            if (this.kecamatanDirect.length > 0 && this.kabupatenList.length === 0) {
+                this.kecamatanList = [...this.kecamatanDirect];
+            }
+
+            if (selectedWilayah) {
+                await this.preloadHierarchy(selectedWilayah, initialWilayahId);
+            }
+        },
+
+        async preloadHierarchy(w, targetId) {
+            let chain = [];
+            let curr = w;
+            while (curr) {
+                chain.unshift(curr);
+                curr = curr.parent;
+            }
+
+            let kab = chain.find(x => x.tingkat === 'kabupaten');
+            let kec = chain.find(x => x.tingkat === 'kecamatan');
+            let kel = chain.find(x => x.tingkat === 'kelurahan');
+            let rt  = chain.find(x => x.tingkat === 'rt' || x.tingkat === 'rw');
+
+            if (kab) {
+                this.selectedKabupaten = kab.id;
+                await this.loadKecamatan();
+            }
+            if (kec) {
+                this.selectedKecamatan = kec.id;
+                await this.loadKelurahan();
+            }
+            if (kel) {
+                this.selectedKelurahan = kel.id;
+                await this.loadRt();
+            }
+            if (rt) {
+                this.selectedRt = rt.id;
+            } else if (targetId) {
+                this.selectedRt = targetId;
+            }
+        },
+
+        async loadKecamatan() {
+            this.kecamatanList = [];
+            this.kelurahanList = [];
+            this.rtList = [];
+            this.selectedKecamatan = '';
+            this.selectedKelurahan = '';
+            this.selectedRt = '';
+
+            if (!this.selectedKabupaten) {
+                if (this.kecamatanDirect.length > 0) {
+                    this.kecamatanList = [...this.kecamatanDirect];
+                }
+                return;
+            }
+
+            this.loadingKecamatan = true;
+            try {
+                let res = await fetch(`/wilayah/${this.selectedKabupaten}/children`);
+                if (res.ok) {
+                    this.kecamatanList = await res.json();
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.loadingKecamatan = false;
+            }
+        },
+
+        async loadKelurahan() {
+            this.kelurahanList = [];
+            this.rtList = [];
+            this.selectedKelurahan = '';
+            this.selectedRt = '';
+
+            if (!this.selectedKecamatan) return;
+
+            this.loadingKelurahan = true;
+            try {
+                let res = await fetch(`/wilayah/${this.selectedKecamatan}/children`);
+                if (res.ok) {
+                    let data = await res.json();
+                    let kel = data.filter(x => x.tingkat === 'kelurahan');
+                    let rt  = data.filter(x => x.tingkat === 'rt' || x.tingkat === 'rw');
+                    this.kelurahanList = kel;
+                    if (rt.length > 0) {
+                        this.rtList = rt;
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.loadingKelurahan = false;
+            }
+        },
+
+        async loadRt() {
+            this.rtList = [];
+            this.selectedRt = '';
+
+            if (!this.selectedKelurahan) return;
+
+            this.loadingRt = true;
+            try {
+                let res = await fetch(`/wilayah/${this.selectedKelurahan}/children`);
+                if (res.ok) {
+                    this.rtList = await res.json();
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.loadingRt = false;
+            }
+        },
+
+        get effectiveWilayahId() {
+            if (this.selectedRt) return this.selectedRt;
+            if (this.selectedKelurahan) return this.selectedKelurahan;
+            if (this.selectedKecamatan) return this.selectedKecamatan;
+            return '';
+        }
     };
 }
 </script>

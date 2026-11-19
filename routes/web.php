@@ -50,6 +50,9 @@ Route::middleware(['auth', 'must.change.pwd'])->group(function () {
         require __DIR__ . '/../app/Modules/Rumah/routes.php';
     });
 
+    // API wilayah children: digunakan form input rumah (cascading dropdown) — semua role bisa akses
+    Route::get('/wilayah/{wilayah}/children', [WilayahController::class, 'children'])->name('wilayah.children');
+
     // scrum-20/21: Survei & Foto (FR-11a, FR-11b)
     Route::prefix('survei')->name('survei.')->group(function () {
         require __DIR__ . '/../app/Modules/Survei/routes.php';

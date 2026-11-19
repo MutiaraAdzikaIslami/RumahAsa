@@ -65,15 +65,32 @@ class RumahController extends Controller
 
     public function create()
     {
-        // Ambil semua RT untuk dropdown wilayah
-        $rtList = Wilayah::where('tingkat', 'rt')->orderBy('nama')->get();
-        
+        // Cascading dropdown: load kabupaten (514 baris, cepat & ringan)
+        // Kecamatan, Kelurahan, RT dimuat via AJAX /wilayah/{id}/children
+        $kabupatenList = Wilayah::where('tingkat', 'kabupaten')
+            ->where('is_aktif', true)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
+
+        // Kecamatan tanpa parent (misal dibuat langsung di environment test/seeder khusus)
+        $kecamatanDirect = Wilayah::where('tingkat', 'kecamatan')
+            ->whereNull('parent_id')
+            ->where('is_aktif', true)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
+
         // FIX: Ambil daftar surveyor untuk dropdown (Admin yang input, pilih surveyor)
         $surveyorList = User::whereHas('role', function ($q) {
             $q->where('kode', 'surveyor');
         })->where('is_aktif', true)->orderBy('nama')->get();
 
-        return view('rumah.create', compact('rtList', 'surveyorList'));
+        // Jika ada old wilayah_id (setelah validasi gagal), preload path untuk re-select
+        $selectedWilayah = null;
+        if ($oldWilayahId = old('wilayah_id')) {
+            $selectedWilayah = Wilayah::with(['parent.parent.parent'])->find($oldWilayahId);
+        }
+
+        return view('rumah.create', compact('kabupatenList', 'kecamatanDirect', 'surveyorList', 'selectedWilayah'));
     }
 
     public function store(Request $request)
@@ -144,7 +161,17 @@ class RumahController extends Controller
 
     public function edit(RumahWarga $rumah)
     {
-        $rtList = Wilayah::where('tingkat', 'rt')->orderBy('nama')->get();
+        $kabupatenList = Wilayah::where('tingkat', 'kabupaten')
+            ->where('is_aktif', true)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
+
+        $kecamatanDirect = Wilayah::where('tingkat', 'kecamatan')
+            ->whereNull('parent_id')
+            ->where('is_aktif', true)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
+
         $surveyorList = User::whereHas('role', function ($q) {
             $q->where('kode', 'surveyor');
         })->where('is_aktif', true)->orderBy('nama')->get();
@@ -153,7 +180,12 @@ class RumahController extends Controller
         $nikPlain = $rumah->nik_enc ? $nikEncryptor->decryptNik($rumah->nik_enc) : '';
         $noKkPlain = $rumah->no_kk_enc ? $nikEncryptor->decryptNoKk($rumah->no_kk_enc) : '';
 
-        return view('rumah.edit', compact('rumah', 'rtList', 'surveyorList', 'nikPlain', 'noKkPlain'));
+        // Preload parent chain untuk re-select cascading dropdown saat edit
+        $selectedWilayah = $rumah->wilayah_id
+            ? Wilayah::with(['parent.parent.parent'])->find($rumah->wilayah_id)
+            : null;
+
+        return view('rumah.edit', compact('rumah', 'kabupatenList', 'kecamatanDirect', 'surveyorList', 'nikPlain', 'noKkPlain', 'selectedWilayah'));
     }
 
     public function update(Request $request, RumahWarga $rumah)

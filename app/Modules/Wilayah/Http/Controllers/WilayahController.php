@@ -93,4 +93,18 @@ class WilayahController extends Controller
     {
         return response()->json($this->service->getDescendants($wilayah));
     }
+
+    /**
+     * API: Ambil children langsung dari parent (untuk cascading dropdown form input rumah).
+     * Accessible oleh semua role yang sudah login.
+     */
+    public function children(Wilayah $wilayah): JsonResponse
+    {
+        $children = $wilayah->children()
+            ->where('is_aktif', true)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama', 'tingkat']);
+
+        return response()->json($children);
+    }
 }
