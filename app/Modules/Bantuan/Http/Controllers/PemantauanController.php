@@ -21,7 +21,13 @@ class PemantauanController extends Controller
     {
         abort_unless(in_array($rumah->status, BantuanController::STATUS_BANTUAN, true), 404);
 
-        $rumah->load(['wilayah', 'penerimaBantuan.progres', 'riwayatStatus']);
+        $rumah->load([
+            'wilayah',
+            'surveyor',
+            'penerimaBantuan.progres.fotos',
+            'survei.komponen.foto',
+            'riwayatStatus',
+        ]);
 
         return view('bantuan.show', ['rumah' => $rumah, 'bantuan' => $rumah->penerimaBantuan]);
     }
