@@ -53,7 +53,7 @@ class DashboardController extends Controller
             ->get();
 
         // Target Hari Ini (Simulasi / Riwayat Status hari ini oleh verifikator)
-        $todayReviewsCount = RiwayatStatus::where('changed_by', $user->id)
+        $todayReviewsCount = RiwayatStatus::where('user_id', $user->id)
             ->whereDate('created_at', Carbon::today())
             ->count();
         $targetTotal = max(8, $todayReviewsCount + $pengajuanMenunggu->count());
