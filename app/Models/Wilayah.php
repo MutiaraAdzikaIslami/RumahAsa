@@ -73,4 +73,104 @@ class Wilayah extends Model
 
         return $parentUrutan === ($childUrutan - 1);
     }
+
+    /**
+     * Mengambil rantai hierarki wilayah ke atas (rt -> rw -> kelurahan -> kecamatan -> kabupaten -> provinsi).
+     */
+    public function hierarki(): array
+    {
+        $chain = [];
+        $curr = $this;
+        $visited = [];
+        while ($curr && !in_array($curr->id, $visited, true)) {
+            $visited[] = $curr->id;
+            $chain[$curr->tingkat] = $curr;
+            $curr = $curr->parent;
+        }
+        return $chain;
+    }
+
+    /**
+     * Format RT/RW singkat, contoh: "RT 007/RW 007".
+     */
+    public function rtRwLabel(): ?string
+    {
+        $h = $this->hierarki();
+        $parts = [];
+        if (isset($h['rt'])) {
+            $rtNama = trim($h['rt']->nama);
+            $parts[] = str_starts_with(strtoupper($rtNama), 'RT') ? $rtNama : 'RT ' . $rtNama;
+        }
+        if (isset($h['rw'])) {
+            $rwNama = trim($h['rw']->nama);
+            $parts[] = str_starts_with(strtoupper($rwNama), 'RW') ? $rwNama : 'RW ' . $rwNama;
+        }
+        return !empty($parts) ? implode('/', $parts) : null;
+    }
+
+    /**
+     * Format wilayah untuk kolom tabel (contoh: "Kel. Nyamplong, Kec. Gayam").
+     */
+    public function namaKelurahanAtauWilayah(): string
+    {
+        $h = $this->hierarki();
+        $parts = [];
+        if (isset($h['kelurahan'])) {
+            $nama = $h['kelurahan']->nama;
+            $parts[] = str_starts_with(strtolower($nama), 'kel') ? $nama : 'Kel. ' . $nama;
+        }
+        if (isset($h['kecamatan'])) {
+            $nama = $h['kecamatan']->nama;
+            $parts[] = str_starts_with(strtolower($nama), 'kec') ? $nama : 'Kec. ' . $nama;
+        }
+        if (!empty($parts)) {
+            return implode(', ', $parts);
+        }
+        if (isset($h['kabupaten'])) {
+            return ucwords(strtolower($h['kabupaten']->nama));
+        }
+        return $this->nama;
+    }
+
+    /**
+     * Format wilayah lengkap dari tingkat terendah hingga kabupaten/kota.
+     */
+    public function namaLengkap(): string
+    {
+        $h = $this->hierarki();
+        $parts = [];
+        if ($rtRw = $this->rtRwLabel()) {
+            $parts[] = $rtRw;
+        }
+        if (isset($h['kelurahan'])) {
+            $nama = $h['kelurahan']->nama;
+            $parts[] = str_starts_with(strtolower($nama), 'kel') ? $nama : 'Kel. ' . $nama;
+        }
+        if (isset($h['kecamatan'])) {
+            $nama = $h['kecamatan']->nama;
+            $parts[] = str_starts_with(strtolower($nama), 'kec') ? $nama : 'Kec. ' . $nama;
+        }
+        if (isset($h['kabupaten'])) {
+            $parts[] = ucwords(strtolower($h['kabupaten']->nama));
+        }
+        return !empty($parts) ? implode(', ', $parts) : $this->nama;
+    }
+
+    /**
+     * Format wilayah tugas untuk kartu sidebar kiri (contoh: "Kabupaten Sumenep" atau "Kec. Gayam, Kab. Sumenep").
+     */
+    public function namaWilayahTugasSidebar(): string
+    {
+        $h = $this->hierarki();
+        if (isset($h['kecamatan'], $h['kabupaten'])) {
+            return 'Kec. ' . ucwords(strtolower($h['kecamatan']->nama)) . ', ' . ucwords(strtolower($h['kabupaten']->nama));
+        }
+        if (isset($h['kabupaten'])) {
+            return ucwords(strtolower($h['kabupaten']->nama));
+        }
+        if (isset($h['kecamatan'])) {
+            return 'Kecamatan ' . ucwords(strtolower($h['kecamatan']->nama));
+        }
+        return $this->nama;
+    }
 }

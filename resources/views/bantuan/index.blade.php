@@ -137,18 +137,13 @@
                                 ? \Carbon\Carbon::parse($tglTerakhir)->format('d M Y')
                                 : $tglTerakhir->format('d M Y');
 
-                            // Label & Badge Status
-                            $badgeStyles = [
-                                'Penerima Bantuan' => 'bg-[#FBF4E6] text-[#A26D27] border border-[#F2DEBF]',
-                                'Dalam Renovasi'   => 'bg-[#F4EFFC] text-[#6941C6] border border-[#E0D4F7]',
-                                'Selesai'          => 'bg-[#EDF7EE] text-[#2D6A4F] border border-[#CDE5D8]',
-                            ];
+                            // Label & Badge Status (Legenda warna konsisten lintas role)
                             $labelStatus = [
                                 'Penerima Bantuan' => 'Belum Dimulai',
                                 'Dalam Renovasi'   => 'Dalam Renovasi',
                                 'Selesai'          => 'Selesai',
                             ];
-                            $badgeClass = $badgeStyles[$r->status] ?? 'bg-slate-100 text-slate-700 border border-slate-200';
+                            $badgeClass = $r->badgeStatusClass($r->status);
                             $label = $labelStatus[$r->status] ?? $r->status;
                         @endphp
                         <tr class="hover:bg-slate-50/70 transition">
@@ -162,12 +157,12 @@
 
                             {{-- Alamat --}}
                             <td class="py-3 px-4">
-                                <div class="text-xs text-slate-600 max-w-xs truncate" title="{{ $r->alamat }}">{{ $r->alamat }}</div>
+                                <div class="text-xs text-slate-600 max-w-xs truncate" title="{{ $r->alamatLengkap() }}">{{ $r->alamatLengkap() }}</div>
                             </td>
 
                             {{-- Wilayah --}}
                             <td class="py-3 px-4">
-                                <div class="text-xs text-slate-700 font-medium whitespace-nowrap">{{ $r->wilayah?->nama ?? '-' }}</div>
+                                <div class="text-xs text-slate-700 font-medium whitespace-nowrap">{{ $r->wilayahSingkat() }}</div>
                             </td>
 
                             {{-- Tanggal Penetapan --}}

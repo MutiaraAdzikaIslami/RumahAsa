@@ -30,20 +30,15 @@
 
     <div class="bg-white rounded-lg shadow p-4">
         @php
-            $badgeColors = [
-                'Draf' => 'bg-slate-100 text-slate-700',
-                'Diajukan' => 'bg-blue-100 text-blue-700',
-                'Perlu Perbaikan' => 'bg-amber-100 text-amber-700',
-                'Layak Huni' => 'bg-emerald-100 text-emerald-700',
-                'Penerima Bantuan' => 'bg-red-100 text-red-700',
-                'Dalam Renovasi' => 'bg-purple-100 text-purple-700',
-                'Selesai' => 'bg-teal-100 text-teal-700',
-            ];
-            $color = $badgeColors[$rumah->status] ?? 'bg-slate-100 text-slate-700';
+            $stAlur = $rumah->statusAlur();
+            $color = $rumah->badgeStatusClass($stAlur);
         @endphp
-        <div class="flex items-center gap-4">
-            <span class="font-mono text-sm text-slate-500">{{ $rumah->kode_registrasi }}</span>
-            <span class="px-3 py-1 rounded-full text-xs font-medium {{ $color }}">{{ $rumah->status }}</span>
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="font-mono text-sm text-slate-500">{{ $rumah->kode_registrasi }}</span>
+                <span class="px-3 py-1 rounded-full text-xs font-semibold {{ $color }}">{{ $stAlur }}</span>
+            </div>
+            <span class="text-xs text-slate-400">Terakhir diperbarui: {{ $rumah->terakhirDiperbaruiLabel() }}</span>
         </div>
     </div>
 
@@ -112,11 +107,11 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
                 <p class="text-slate-500 text-xs">Wilayah</p>
-                <p class="font-medium">{{ $rumah->wilayah?->nama ?? '-' }}</p>
+                <p class="font-medium">{{ $rumah->wilayah?->namaLengkap() ?? '-' }}</p>
             </div>
             <div>
                 <p class="text-slate-500 text-xs">Alamat</p>
-                <p>{{ $rumah->alamat ?? '-' }}</p>
+                <p>{{ $rumah->alamatLengkap() }}</p>
             </div>
             <div>
                 <p class="text-slate-500 text-xs">Latitude</p>

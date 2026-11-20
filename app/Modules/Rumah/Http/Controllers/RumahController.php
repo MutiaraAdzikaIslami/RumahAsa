@@ -20,23 +20,35 @@ class RumahController extends Controller
 
     public function index(Request $request)
     {
-        $query = RumahWarga::with(['wilayah', 'surveyor', 'survei']);
+        $baseQuery = RumahWarga::with(['wilayah.parent.parent.parent', 'surveyor', 'survei.komponenSurvei', 'penerimaBantuan.progres']);
 
         // Policy: Surveyor hanya lihat wilayahnya
         $user = auth()->user();
         if ($user->isSurveyor() && $user->wilayah) {
             $wilayahPath = $user->wilayah->path;
-            $query->whereHas('wilayah', function ($q) use ($wilayahPath) {
+            $baseQuery->whereHas('wilayah', function ($q) use ($wilayahPath) {
                 $q->where('path', $wilayahPath)
                   ->orWhere('path', 'like', $wilayahPath . '/%');
             });
         }
 
-        // FIX: Filter berdasarkan nama lokasi (kelurahan/kecamatan/dll)
+        // Hitung 8 kartu status alur sebelum difilter search/status
+        $statusAlurCounts = array_fill_keys(RumahWarga::STATUS_ALUR_LIST, 0);
+        foreach ((clone $baseQuery)->get() as $rmCount) {
+            $stAlur = $rmCount->statusAlur();
+            if (isset($statusAlurCounts[$stAlur])) {
+                $statusAlurCounts[$stAlur]++;
+            }
+        }
+
+        $query = clone $baseQuery;
+
+        // Filter berdasarkan nama KK, kode, alamat, atau nama wilayah
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('kode_registrasi', 'like', "%{$search}%")
                   ->orWhere('nama_kepala_keluarga', 'like', "%{$search}%")
+                  ->orWhere('alamat', 'like', "%{$search}%")
                   ->orWhereHas('wilayah', function ($q2) use ($search) {
                       $q2->where('nama', 'like', "%{$search}%");
                   });
@@ -44,7 +56,17 @@ class RumahController extends Controller
         }
 
         if ($status = $request->query('status')) {
-            $query->where('status', $status);
+            if ($status === RumahWarga::STATUS_MENUNGGU_SURVEI) {
+                $query->where('status', RumahWarga::STATUS_DRAF)
+                    ->where(function ($q) {
+                        $q->whereDoesntHave('survei')
+                          ->orWhereDoesntHave('survei.komponenSurvei', function ($qk) {
+                              $qk->whereNotNull('opsi_kondisi_id')->orWhereNotNull('catatan');
+                          });
+                    });
+            } else {
+                $query->where('status', $status);
+            }
         }
 
         if ($wilayahId = $request->query('wilayah_id')) {
@@ -57,10 +79,23 @@ class RumahController extends Controller
             }
         }
 
-        $rumah = $query->latest()->paginate(15);
-        $wilayahList = Wilayah::orderBy('tingkat')->orderBy('nama')->get();
+        $rumah = $query->latest('updated_at')->paginate(15)->withQueryString();
 
-        return view('rumah.index', compact('rumah', 'wilayahList'));
+        // Optimasi dropdown wilayah: utamakan wilayah yang punya rumah atau berada di wilayah tugas surveyor
+        $wilayahQuery = Wilayah::query();
+        if ($user->isSurveyor() && $user->wilayah && $user->wilayah->path) {
+            $wPath = $user->wilayah->path;
+            $wilayahQuery->where(function ($q) use ($wPath) {
+                $q->where('path', $wPath)->orWhere('path', 'like', $wPath . '/%');
+            });
+        } else {
+            $wilayahQuery->where(function ($q) {
+                $q->whereHas('rumahWarga')->orWhereIn('tingkat', ['kabupaten', 'kecamatan']);
+            });
+        }
+        $wilayahList = $wilayahQuery->orderBy('tingkat')->orderBy('nama')->limit(200)->get();
+
+        return view('rumah.index', compact('rumah', 'wilayahList', 'statusAlurCounts'));
     }
 
     public function create()
