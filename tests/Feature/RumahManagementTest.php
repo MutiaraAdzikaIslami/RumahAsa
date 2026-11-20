@@ -144,6 +144,26 @@ class RumahManagementTest extends TestCase
         $response->assertDontSee($rumahLain->nama_kepala_keluarga);
     }
 
+    public function test_tambah_rumah_dengan_surveyor_di_luar_wilayah_ditolak_validasi(): void
+    {
+        $kecLain = Wilayah::create(['kode' => 'KEC-VAL', 'nama' => 'Kec Val', 'tingkat' => 'kecamatan']);
+        $kecLain->update(['path' => '/' . $kecLain->id]);
+        $rtLain = Wilayah::create(['kode' => 'RT-VAL', 'nama' => 'RT Val', 'tingkat' => 'rt', 'parent_id' => $kecLain->id]);
+        $rtLain->update(['path' => $kecLain->path . '/' . $rtLain->id]);
+
+        $response = $this->actingAs($this->admin)->post('/rumah', [
+            'nama_kepala_keluarga' => 'Warga Luar Wilayah',
+            'nik'                  => '3201999988887777',
+            'no_kk'                => '3201999988887777',
+            'alamat'               => 'Jl. Luar Wilayah',
+            'wilayah_id'           => $rtLain->id,
+            'surveyor_id'          => $this->surveyor->id, // surveyor bertugas di $this->rt, bukan $rtLain
+            'action'               => 'save',
+        ]);
+
+        $response->assertSessionHasErrors(['surveyor_id']);
+    }
+
     public function test_input_rumah_mencatat_audit_log(): void
     {
         $this->actingAs($this->admin)->post('/rumah', [

@@ -73,6 +73,24 @@ class HeatmapSampleDataSeeder extends Seeder
                 );
                 $rw->update(['path' => $kel->path.'/'.$rw->id]);
                 $rwModels[$nama][$rwNama] = $rw;
+
+                // Buat RT 01 s/d RT 03 jika Kel. Sukamaju
+                if ($nama === 'Kel. Sukamaju') {
+                    for ($rtNum = 1; $rtNum <= 3; $rtNum++) {
+                        $rtKode = $rwKode.'-RT0'.$rtNum;
+                        $rtNama = 'RT 0'.$rtNum;
+                        $rt = Wilayah::firstOrCreate(
+                            ['kode' => $rtKode],
+                            [
+                                'nama' => $rtNama,
+                                'tingkat' => Wilayah::TINGKAT_RT,
+                                'parent_id' => $rw->id,
+                                'is_aktif' => true,
+                            ]
+                        );
+                        $rt->update(['path' => $rw->path.'/'.$rt->id]);
+                    }
+                }
             }
         }
 

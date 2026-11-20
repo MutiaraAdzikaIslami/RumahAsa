@@ -70,16 +70,31 @@ class RumahController extends Controller
 
         // Ambil semua wilayah tingkat RT & RW untuk dropdown
         $rtList = Wilayah::whereIn('tingkat', [Wilayah::TINGKAT_RT, Wilayah::TINGKAT_RW])
-            ->with('parent')
+            ->with(['parent.parent.parent'])
             ->orderBy('path')
             ->get();
         
         // FIX: Ambil daftar surveyor untuk dropdown (Admin yang input, pilih surveyor)
         $surveyorList = User::whereHas('role', function ($q) {
             $q->where('kode', 'surveyor');
-        })->where('is_aktif', true)->orderBy('nama')->get();
+        })->where('is_aktif', true)->with('wilayah')->orderBy('nama')->get();
 
-        return view('rumah.create', compact('rtList', 'surveyorList'));
+        $wilayahData = $rtList->map(fn($w) => [
+            'id' => $w->id,
+            'nama' => $w->nama_lengkap,
+            'path' => $w->path,
+            'tingkat' => $w->tingkat,
+        ]);
+
+        $surveyorData = $surveyorList->map(fn($s) => [
+            'id' => $s->id,
+            'nama' => $s->nama,
+            'wilayah_id' => $s->wilayah_id,
+            'wilayah_nama' => $s->wilayah?->nama,
+            'wilayah_path' => $s->wilayah?->path,
+        ]);
+
+        return view('rumah.create', compact('rtList', 'surveyorList', 'wilayahData', 'surveyorData'));
     }
 
     public function store(Request $request)
@@ -109,6 +124,10 @@ class RumahController extends Controller
             'nik.size' => 'NIK harus 16 digit.',
             'no_kk.size' => 'No. KK harus 16 digit.',
         ]);
+
+        if ($err = $this->validateSurveyorWilayah($validated['wilayah_id'] ?? null, $validated['surveyor_id'] ?? null)) {
+            return back()->withErrors(['surveyor_id' => $err])->withInput();
+        }
 
         $nikEncryptor = app(NikEncryptor::class);
         if (!empty($validated['nik'])) {
@@ -155,18 +174,33 @@ class RumahController extends Controller
         Gate::authorize('update', $rumah);
 
         $rtList = Wilayah::whereIn('tingkat', [Wilayah::TINGKAT_RT, Wilayah::TINGKAT_RW])
-            ->with('parent')
+            ->with(['parent.parent.parent'])
             ->orderBy('path')
             ->get();
         $surveyorList = User::whereHas('role', function ($q) {
             $q->where('kode', 'surveyor');
-        })->where('is_aktif', true)->orderBy('nama')->get();
+        })->where('is_aktif', true)->with('wilayah')->orderBy('nama')->get();
+
+        $wilayahData = $rtList->map(fn($w) => [
+            'id' => $w->id,
+            'nama' => $w->nama_lengkap,
+            'path' => $w->path,
+            'tingkat' => $w->tingkat,
+        ]);
+
+        $surveyorData = $surveyorList->map(fn($s) => [
+            'id' => $s->id,
+            'nama' => $s->nama,
+            'wilayah_id' => $s->wilayah_id,
+            'wilayah_nama' => $s->wilayah?->nama,
+            'wilayah_path' => $s->wilayah?->path,
+        ]);
 
         $nikEncryptor = app(NikEncryptor::class);
         $nikPlain = $rumah->nik_enc ? $nikEncryptor->decryptNik($rumah->nik_enc) : '';
         $noKkPlain = $rumah->no_kk_enc ? $nikEncryptor->decryptNoKk($rumah->no_kk_enc) : '';
 
-        return view('rumah.edit', compact('rumah', 'rtList', 'surveyorList', 'nikPlain', 'noKkPlain'));
+        return view('rumah.edit', compact('rumah', 'rtList', 'surveyorList', 'nikPlain', 'noKkPlain', 'wilayahData', 'surveyorData'));
     }
 
     public function update(Request $request, RumahWarga $rumah)
@@ -192,6 +226,10 @@ class RumahController extends Controller
         ];
 
         $validated = $request->validate($rules);
+
+        if ($err = $this->validateSurveyorWilayah($validated['wilayah_id'] ?? null, $validated['surveyor_id'] ?? null)) {
+            return back()->withErrors(['surveyor_id' => $err])->withInput();
+        }
 
         $nikEncryptor = app(NikEncryptor::class);
         if (!empty($validated['nik'])) {
@@ -225,5 +263,34 @@ class RumahController extends Controller
 
         return redirect()->route('rumah.show', $rumah)
             ->with('success', 'Data rumah berhasil diperbarui.');
+    }
+
+    /**
+     * Memastikan wilayah tugas surveyor menaungi wilayah rumah yang dipilih.
+     */
+    private function validateSurveyorWilayah(?int $wilayahId, ?int $surveyorId): ?string
+    {
+        if (!$wilayahId || !$surveyorId) {
+            return null;
+        }
+
+        $wilayah = Wilayah::find($wilayahId);
+        $surveyor = User::with('wilayah')->find($surveyorId);
+
+        if (!$wilayah || !$surveyor || !$surveyor->wilayah) {
+            return null;
+        }
+
+        $surveyorPath = rtrim($surveyor->wilayah->path, '/') . '/';
+        $wilayahPath = rtrim($wilayah->path, '/') . '/';
+
+        $isMatch = ($wilayah->id === $surveyor->wilayah->id)
+            || str_starts_with($wilayahPath, $surveyorPath);
+
+        if (!$isMatch) {
+            return "Surveyor {$surveyor->nama} bertugas di {$surveyor->wilayah->nama}, tidak mencakup wilayah {$wilayah->nama}. Silakan pilih wilayah di bawah {$surveyor->wilayah->nama} atau pilih surveyor yang sesuai.";
+        }
+
+        return null;
     }
 }

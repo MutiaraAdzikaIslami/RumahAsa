@@ -56,6 +56,17 @@ class Wilayah extends Model
         return $q->where('path', 'like', $parent->path . '/%');
     }
 
+    public function getNamaLengkapAttribute(): string
+    {
+        $parts = [$this->nama];
+        $current = $this->parent;
+        while ($current) {
+            array_unshift($parts, $current->nama);
+            $current = $current->parent;
+        }
+        return implode(' — ', $parts);
+    }
+
     public static function isValidParent(?int $parentId, string $childTingkat): bool
     {
         if ($childTingkat === self::TINGKAT_KECAMATAN) {

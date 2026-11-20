@@ -68,11 +68,11 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Wilayah (RT / RW) <span class="text-red-500">*</span></label>
-                    <select name="wilayah_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    <select name="wilayah_id" x-model="wilayahId" @change="onWilayahChange()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
                         <option value="">Pilih Wilayah...</option>
                         @foreach ($rtList as $rt)
                             <option value="{{ $rt->id }}" {{ old('wilayah_id') == $rt->id ? 'selected' : '' }}>
-                                [{{ strtoupper($rt->tingkat) }}] {{ $rt->parent ? $rt->parent->nama . ' - ' : '' }}{{ $rt->nama }} ({{ $rt->kode }})
+                                [{{ strtoupper($rt->tingkat) }}] {{ $rt->nama_lengkap }} ({{ $rt->kode }})
                             </option>
                         @endforeach
                     </select>
@@ -90,13 +90,17 @@
             <div class="grid grid-cols-1 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Surveyor yang Bertugas <span class="text-red-500">*</span></label>
-                    <select name="surveyor_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                    <select name="surveyor_id" x-model="surveyorId" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
                         <option value="">Pilih Surveyor...</option>
                         @foreach ($surveyorList as $surveyor)
-                            <option value="{{ $surveyor->id }}" {{ old('surveyor_id') == $surveyor->id ? 'selected' : '' }}>{{ $surveyor->nama }} ({{ $surveyor->wilayah?->nama ?? 'Tanpa Wilayah' }})</option>
+                            <option value="{{ $surveyor->id }}" {{ old('surveyor_id') == $surveyor->id ? 'selected' : '' }}>{{ $surveyor->nama }} (Wilayah Tugas: {{ $surveyor->wilayah?->nama ?? 'Tanpa Wilayah' }})</option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-slate-500">Pilih surveyor yang akan menangani rumah ini. Surveyor hanya bisa melihat rumah di wilayah tugasnya.</p>
+                    <p class="mt-1 text-xs text-slate-500">Pilih surveyor yang bertugas. Surveyor hanya dapat melihat dan menyurvei rumah di wilayah tugasnya.</p>
+                    <div x-show="surveyorWarning" class="mt-2 p-2.5 rounded bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-1.5">
+                        <span class="font-bold">⚠️</span>
+                        <span x-text="surveyorWarning"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -145,6 +149,45 @@ function rumahForm() {
         latitude: '{{ old('latitude') }}',
         longitude: '{{ old('longitude') }}',
         gpsLoading: false,
+        wilayahId: '{{ old('wilayah_id') }}',
+        surveyorId: '{{ old('surveyor_id') }}',
+        wilayahList: @json($wilayahData),
+        surveyorList: @json($surveyorData),
+
+        onWilayahChange() {
+            if (!this.wilayahId) return;
+            const selectedW = this.wilayahList.find(w => w.id == this.wilayahId);
+            if (!selectedW) return;
+
+            // Cari surveyor yang wilayah tugasnya menaungi wilayah terpilih
+            const matchingSurveyor = this.surveyorList.find(s => {
+                if (!s.wilayah_path) return false;
+                const sPath = s.wilayah_path.replace(/\/+$/, '') + '/';
+                const wPath = selectedW.path.replace(/\/+$/, '') + '/';
+                return selectedW.id == s.wilayah_id || wPath.startsWith(sPath);
+            });
+
+            if (matchingSurveyor) {
+                this.surveyorId = matchingSurveyor.id;
+            }
+        },
+
+        get surveyorWarning() {
+            if (!this.wilayahId || !this.surveyorId) return null;
+            const selectedW = this.wilayahList.find(w => w.id == this.wilayahId);
+            const selectedS = this.surveyorList.find(s => s.id == this.surveyorId);
+            if (!selectedW || !selectedS) return null;
+
+            if (!selectedS.wilayah_path) {
+                return `Surveyor ${selectedS.nama} belum memiliki wilayah tugas.`;
+            }
+            const sPath = selectedS.wilayah_path.replace(/\/+$/, '') + '/';
+            const wPath = selectedW.path.replace(/\/+$/, '') + '/';
+            if (selectedW.id != selectedS.wilayah_id && !wPath.startsWith(sPath)) {
+                return `Surveyor ${selectedS.nama} bertugas di ${selectedS.wilayah_nama}, tidak mencakup wilayah ${selectedW.nama}. Rumah ini tidak akan muncul di daftar tugas surveyor tersebut!`;
+            }
+            return null;
+        },
 
         ambilGPS() {
             if (!navigator.geolocation) {
