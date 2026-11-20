@@ -1,64 +1,56 @@
 @extends('layouts.app')
 
-@section('title', 'Rekap Dana Bantuan')
+@section('title', 'Rekap Dana')
 
 @section('content')
-<div x-data="{ openExportModal: false, exportFormat: 'excel' }" class="space-y-6">
+@php
+    $triwulanLabels = [
+        '1' => 'Triwulan 1 (Jan–Mar)',
+        '2' => 'Triwulan 2 (Apr–Jun)',
+        '3' => 'Triwulan 3 (Jul–Sep)',
+        '4' => 'Triwulan 4 (Okt–Des)',
+    ];
+    $labelPeriodeTotal = $triwulan && isset($triwulanLabels[(string) $triwulan])
+        ? 'Total Triwulan ' . $triwulan . ' ' . $tahun
+        : 'Total Tahun ' . $tahun;
+@endphp
 
-    {{-- Header --}}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <div class="flex items-center gap-2.5">
-                <h1 class="text-2xl font-extrabold text-slate-900">Rekapitulasi Dana Bantuan</h1>
-                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-forest/10 text-forest border border-forest/20">
-                    Tahun {{ $tahun }}
-                </span>
-            </div>
-            <p class="text-xs text-slate-500 mt-1">Rekap dana bantuan per triwulan berdasarkan sumber program, jenis bantuan, dan wilayah.</p>
-        </div>
+<div x-data="{ openExportModal: false, exportFormat: 'excel' }" @keydown.escape.window="openExportModal = false" class="space-y-6">
 
-        <button type="button" @click="openExportModal = true" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-sm transition">
-            <i data-lucide="download" class="w-4 h-4"></i>
-            Ekspor Rekap Dana
-        </button>
+    {{-- Header Halaman Sesuai Mockup Page 3 --}}
+    <div>
+        <h1 class="text-3xl font-extrabold text-slate-900">Rekap Dana Bantuan</h1>
+        <p class="text-sm text-slate-500 mt-1">Dana yang dicatat disalurkan per triwulan.</p>
     </div>
 
-    {{-- Filter Bar --}}
-    <form method="GET" action="{{ route('bantuan.rekap') }}" class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Tahun Anggaran</label>
-                <select name="tahun" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white">
+    {{-- Filter Bar Card Sesuai Mockup Page 3 --}}
+    <form method="GET" action="{{ route('bantuan.rekap') }}" class="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end">
+            {{-- Tahun --}}
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Tahun</label>
+                <select name="tahun" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest cursor-pointer">
                     @for ($y = now()->year; $y >= 2024; $y--)
                         <option value="{{ $y }}" {{ (int) $tahun === $y ? 'selected' : '' }}>{{ $y }}</option>
                     @endfor
                 </select>
             </div>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Triwulan</label>
-                <select name="triwulan" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white">
+            {{-- Triwulan --}}
+            <div class="lg:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Triwulan</label>
+                <select name="triwulan" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest cursor-pointer">
                     <option value="">Semua Triwulan</option>
-                    <option value="1" {{ (string) $triwulan === '1' ? 'selected' : '' }}>Triwulan 1 (Januari–Maret)</option>
-                    <option value="2" {{ (string) $triwulan === '2' ? 'selected' : '' }}>Triwulan 2 (April–Juni)</option>
-                    <option value="3" {{ (string) $triwulan === '3' ? 'selected' : '' }}>Triwulan 3 (Juli–September)</option>
-                    <option value="4" {{ (string) $triwulan === '4' ? 'selected' : '' }}>Triwulan 4 (Oktober–Desember)</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Sumber Program</label>
-                <select name="sumber_program" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white">
-                    <option value="">Semua Sumber Program</option>
-                    @foreach (['APBD', 'APBN', 'CSR', 'Swadaya'] as $sp)
-                        <option value="{{ $sp }}" {{ $sumberProgram === $sp ? 'selected' : '' }}>{{ $sp }}</option>
+                    @foreach ($triwulanLabels as $twKey => $twText)
+                        <option value="{{ $twKey }}" {{ (string) $triwulan === (string) $twKey ? 'selected' : '' }}>{{ $twText }}</option>
                     @endforeach
                 </select>
             </div>
 
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Wilayah</label>
-                <select name="wilayah_id" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white">
+            {{-- Wilayah --}}
+            <div class="lg:col-span-3">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Wilayah</label>
+                <select name="wilayah_id" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest cursor-pointer">
                     <option value="">Semua Wilayah</option>
                     @foreach ($wilayahList as $w)
                         <option value="{{ $w->id }}" {{ (string) $wilayahId === (string) $w->id ? 'selected' : '' }}>
@@ -68,199 +60,275 @@
                 </select>
             </div>
 
-            <div class="flex items-center gap-2">
-                <button type="submit" class="flex-1 px-4 py-2 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold transition">
-                    Terapkan
+            {{-- Sumber Program --}}
+            <div class="lg:col-span-2">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Sumber Program</label>
+                <select name="sumber_program" onchange="this.form.submit()" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest cursor-pointer">
+                    <option value="">Semua</option>
+                    @foreach (['APBN', 'APBD', 'CSR', 'Swadaya'] as $sp)
+                        <option value="{{ $sp }}" {{ $sumberProgram === $sp ? 'selected' : '' }}>{{ $sp }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- Tombol Ekspor --}}
+            <div class="lg:col-span-2 flex items-center gap-2">
+                <button type="button" @click="openExportModal = true" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-xs transition">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>Ekspor</span>
                 </button>
-                <a href="{{ route('bantuan.rekap') }}" class="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium">
-                    Reset
-                </a>
             </div>
         </div>
     </form>
 
-    {{-- Kartu Ringkasan Utama --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Dana Tersalurkan</p>
-            <p class="text-2xl font-extrabold text-forest mt-1">Rp {{ number_format($totalNominal, 0, ',', '.') }}</p>
-            <p class="text-xs text-slate-400 mt-1">Akumulasi sesuai filter aktif</p>
+    {{-- Kartu 1: Ringkasan per Sumber Program (Sesuai Mockup Page 3) --}}
+    <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div class="p-6 border-b border-slate-100">
+            <h2 class="text-base font-extrabold text-slate-900">Ringkasan per Sumber Program</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Akumulasi sesuai filter yang dipilih</p>
         </div>
 
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Jumlah Penerima Bantuan</p>
-            <p class="text-2xl font-extrabold text-slate-900 mt-1">{{ $totalPenerima }} KK</p>
-            <p class="text-xs text-slate-400 mt-1">Rumah warga penerima dana</p>
-        </div>
-
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Rata-rata Bantuan / KK</p>
-            <p class="text-2xl font-extrabold text-slate-900 mt-1">
-                Rp {{ $totalPenerima > 0 ? number_format($totalNominal / $totalPenerima, 0, ',', '.') : 0 }}
-            </p>
-            <p class="text-xs text-slate-400 mt-1">Per kepala keluarga</p>
-        </div>
-    </div>
-
-    {{-- Rekap per Sumber Program & Jenis Bantuan --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <h2 class="text-sm font-bold text-slate-900 mb-3">Rekap Berdasarkan Sumber Program</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs text-left">
-                    <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                        <tr>
-                            <th class="py-2.5 px-3">Sumber Program</th>
-                            <th class="py-2.5 px-3 text-center">Jumlah KK</th>
-                            <th class="py-2.5 px-3 text-right">Total Nominal</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @forelse ($rekapSumber as $sumber => $data)
-                            <tr>
-                                <td class="py-2.5 px-3 font-semibold text-slate-800">{{ $sumber }}</td>
-                                <td class="py-2.5 px-3 text-center">{{ $data['jumlah'] }} KK</td>
-                                <td class="py-2.5 px-3 text-right font-mono font-bold text-forest">Rp {{ number_format($data['nominal'], 0, ',', '.') }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="3" class="py-6 text-center text-slate-400">Belum ada data penyaluran pada periode ini.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-            <h2 class="text-sm font-bold text-slate-900 mb-3">Rekap Berdasarkan Jenis Bantuan</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs text-left">
-                    <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                        <tr>
-                            <th class="py-2.5 px-3">Jenis Bantuan</th>
-                            <th class="py-2.5 px-3 text-center">Jumlah KK</th>
-                            <th class="py-2.5 px-3 text-right">Total Nominal</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @forelse ($rekapJenis as $jenis => $data)
-                            <tr>
-                                <td class="py-2.5 px-3 font-semibold text-slate-800">{{ $jenis }}</td>
-                                <td class="py-2.5 px-3 text-center">{{ $data['jumlah'] }} KK</td>
-                                <td class="py-2.5 px-3 text-right font-mono font-bold text-forest">Rp {{ number_format($data['nominal'], 0, ',', '.') }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="3" class="py-6 text-center text-slate-400">Belum ada data penyaluran pada periode ini.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    {{-- Rincian Penyaluran --}}
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="p-5 border-b border-slate-200">
-            <h2 class="text-base font-bold text-slate-900">Rincian Penyaluran Dana Bantuan</h2>
-            <p class="text-xs text-slate-500">Daftar detail penerima bantuan yang tercakup dalam filter rekapitulasi.</p>
-        </div>
         <div class="overflow-x-auto">
             <table class="w-full text-xs text-left">
-                <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider">
+                <thead class="bg-slate-50/70 text-slate-400 font-bold border-b border-slate-100 uppercase tracking-wider text-[10px]">
                     <tr>
-                        <th class="py-3 px-4">Tanggal</th>
-                        <th class="py-3 px-4">Kode Rumah</th>
-                        <th class="py-3 px-4">Kepala Keluarga</th>
-                        <th class="py-3 px-4">Wilayah</th>
-                        <th class="py-3 px-4">Sumber / Jenis</th>
-                        <th class="py-3 px-4">Nomor SK</th>
-                        <th class="py-3 px-4 text-right">Nominal</th>
+                        <th class="py-3.5 px-6">Sumber Program</th>
+                        <th class="py-3.5 px-4">Total Dana Tersalur</th>
+                        <th class="py-3.5 px-4">Jumlah Rumah</th>
+                        <th class="py-3.5 px-6">Rata-rata per Rumah</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @forelse ($rekapSumber as $sumber => $data)
+                        <tr class="hover:bg-slate-50/60 transition">
+                            <td class="py-4 px-6">
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold {{ \App\Models\PenerimaBantuan::badgeSumberClass($sumber) }}">
+                                    {{ $sumber }}
+                                </span>
+                            </td>
+                            <td class="py-4 px-4 font-extrabold text-slate-900 text-sm">
+                                Rp{{ number_format($data['nominal'], 0, ',', '.') }}
+                            </td>
+                            <td class="py-4 px-4 text-slate-600 font-medium">
+                                {{ $data['jumlah'] }} rumah
+                            </td>
+                            <td class="py-4 px-6 text-slate-600 font-medium">
+                                Rp{{ number_format($data['rata_rata'] ?? ($data['jumlah'] > 0 ? $data['nominal'] / $data['jumlah'] : 0), 0, ',', '.') }}
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="py-8 text-center text-slate-400">Belum ada data penyaluran pada periode filter ini.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+                <tfoot class="bg-emerald-50/70 border-t border-emerald-100 font-extrabold text-slate-900 text-xs">
+                    <tr>
+                        <td class="py-4 px-6">{{ $labelPeriodeTotal }}</td>
+                        <td class="py-4 px-4 text-sm text-forest">Rp{{ number_format($totalNominal, 0, ',', '.') }}</td>
+                        <td class="py-4 px-4">{{ $totalPenerima }} rumah</td>
+                        <td class="py-4 px-6">Rp{{ $totalPenerima > 0 ? number_format($totalNominal / $totalPenerima, 0, ',', '.') : 0 }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    {{-- Kartu 2: Rumah Penerima Dana (Sesuai Mockup Page 3 + Golden Rule Legenda Status) --}}
+    <div class="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-base font-extrabold text-slate-900">Rumah Penerima Dana</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Daftar rumah penerima sesuai filter aktif</p>
+            </div>
+
+            <form method="GET" action="{{ route('bantuan.rekap') }}" class="relative w-full sm:w-80">
+                <input type="hidden" name="tahun" value="{{ $tahun }}">
+                @if ($triwulan) <input type="hidden" name="triwulan" value="{{ $triwulan }}"> @endif
+                @if ($wilayahId) <input type="hidden" name="wilayah_id" value="{{ $wilayahId }}"> @endif
+                @if ($sumberProgram) <input type="hidden" name="sumber_program" value="{{ $sumberProgram }}"> @endif
+
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                <input
+                    type="text"
+                    name="search"
+                    value="{{ $search ?? request('search') }}"
+                    placeholder="Cari kode rumah, nama kepala keluarga, atau NIK..."
+                    class="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50/70 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest"
+                >
+            </form>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+                <thead class="bg-slate-50/70 text-slate-400 font-bold border-b border-slate-100 uppercase tracking-wider text-[10px]">
+                    <tr>
+                        <th class="py-3.5 px-6">Kode</th>
+                        <th class="py-3.5 px-4">Nama Kepala Keluarga</th>
+                        <th class="py-3.5 px-4">NIK</th>
+                        <th class="py-3.5 px-4">Wilayah</th>
+                        <th class="py-3.5 px-4">Jenis Bantuan</th>
+                        <th class="py-3.5 px-4">Sumber Program</th>
+                        <th class="py-3.5 px-4">Status Renovasi</th>
+                        <th class="py-3.5 px-4">Nominal</th>
+                        <th class="py-3.5 px-6">Tanggal Penyaluran</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($daftarBantuan as $b)
-                        <tr class="hover:bg-slate-50/80">
-                            <td class="py-3 px-4 text-slate-600">{{ $b->tanggal_bantuan?->format('d/m/Y') ?? '-' }}</td>
-                            <td class="py-3 px-4 font-mono font-medium text-slate-900">{{ $b->rumah?->kode_registrasi ?? '-' }}</td>
-                            <td class="py-3 px-4 font-bold text-slate-800">{{ $b->rumah?->nama_kepala_keluarga ?? '-' }}</td>
-                            <td class="py-3 px-4 text-slate-600">{{ $b->rumah?->wilayah?->nama ?? '-' }}</td>
-                            <td class="py-3 px-4">
-                                <span class="px-2 py-0.5 rounded-full bg-forest/10 text-forest font-bold text-[10px]">{{ $b->sumber_program ?? 'APBD' }}</span>
-                                <span class="text-slate-600 ml-1">{{ $b->jenis_bantuan }}</span>
+                        @php
+                            $rm = $b->rumah;
+                            $sumberVal = $b->sumber_program ?: 'APBD';
+                            $tglBantuanStr = $b->tanggal_bantuan
+                                ? \Carbon\Carbon::parse($b->tanggal_bantuan)->format('d M Y')
+                                : '-';
+                        @endphp
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="py-4 px-6 font-mono font-bold text-slate-900">
+                                @if ($rm)
+                                    <a href="{{ route('bantuan.show', $rm) }}" class="hover:text-forest hover:underline">{{ $rm->kode_registrasi }}</a>
+                                @else
+                                    -
+                                @endif
                             </td>
-                            <td class="py-3 px-4 font-mono text-slate-500">{{ $b->nomor_sk ?? '-' }}</td>
-                            <td class="py-3 px-4 text-right font-mono font-bold text-slate-900">Rp {{ number_format($b->nominal, 0, ',', '.') }}</td>
+                            <td class="py-4 px-4 font-bold text-slate-900">
+                                {{ $rm?->nama_kepala_keluarga ?? '-' }}
+                            </td>
+                            <td class="py-4 px-4 font-mono text-slate-500">
+                                {{ $rm && $rm->nik_enc ? $rm->nikTersamar() : '-' }}
+                            </td>
+                            <td class="py-4 px-4 text-slate-600">
+                                {{ $rm ? $rm->wilayahSingkat() : '-' }}
+                            </td>
+                            <td class="py-4 px-4 text-slate-600">
+                                {{ $b->jenis_bantuan }}
+                            </td>
+                            <td class="py-4 px-4">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold {{ \App\Models\PenerimaBantuan::badgeSumberClass($sumberVal) }}">
+                                    {{ $sumberVal }}
+                                </span>
+                            </td>
+                            <td class="py-4 px-4">
+                                @if ($rm)
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold {{ $rm->badgeStatusClass($rm->status) }}">
+                                        {{ $rm->status }}
+                                    </span>
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td class="py-4 px-4 font-extrabold text-slate-900 whitespace-nowrap">
+                                Rp{{ number_format($b->nominal, 0, ',', '.') }}
+                            </td>
+                            <td class="py-4 px-6 text-slate-500 whitespace-nowrap">
+                                {{ $tglBantuanStr }}
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="py-8 text-center text-slate-400">Belum ada data penyaluran bantuan untuk filter ini.</td>
+                            <td colspan="9" class="py-10 text-center text-slate-400">Belum ada data rumah penerima dana untuk filter ini.</td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Menampilkan {{ $daftarBantuan->count() > 0 ? '1–' . $daftarBantuan->count() : '0' }} dari {{ $daftarBantuan->count() }} data</span>
+            <div class="flex items-center gap-1">
+                <span class="w-7 h-7 rounded-lg bg-forest text-white font-bold flex items-center justify-center">1</span>
+            </div>
+        </div>
     </div>
 
-    {{-- Modal Ekspor Rekap Dana Sesuai Mockup Mutiara --}}
-    <div x-show="openExportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-        <div @click.away="openExportModal = false" class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-xl space-y-5">
-            <div class="flex items-start justify-between">
-                <div>
-                    <h3 class="text-lg font-extrabold text-slate-900">Ekspor Rekap Dana</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Pilih format file untuk mengunduh rekap sesuai filter yang digunakan.</p>
+    {{-- Modal Ekspor Rekap Dana Sesuai Mockup Page 1 --}}
+    <div x-show="openExportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 backdrop-blur-xs p-4">
+        <div @click.away="openExportModal = false" class="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-7 shadow-2xl space-y-5">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-forest flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-extrabold text-slate-900">Ekspor Rekap Dana</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Pilih format file untuk mengunduh rekap sesuai filter yang digunakan.</p>
+                    </div>
                 </div>
                 <button type="button" @click="openExportModal = false" class="text-slate-400 hover:text-slate-600">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
 
-            <div class="rounded-xl bg-slate-50 border border-slate-200 p-3.5 space-y-2 text-xs">
-                <p class="font-bold text-slate-700">Ringkasan filter</p>
-                <div class="grid grid-cols-2 gap-2 text-slate-600">
-                    <div>
+            <div class="space-y-2.5">
+                <p class="text-xs font-extrabold text-slate-800">Ringkasan filter</p>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="rounded-xl bg-slate-50 border border-slate-200/70 p-3">
                         <span class="text-slate-400 block text-[11px]">Tahun</span>
-                        <span class="font-semibold text-slate-800">{{ $tahun }}</span>
+                        <span class="font-bold text-slate-900 mt-0.5 block">{{ $tahun }}</span>
                     </div>
-                    <div>
+                    <div class="rounded-xl bg-slate-50 border border-slate-200/70 p-3">
                         <span class="text-slate-400 block text-[11px]">Triwulan</span>
-                        <span class="font-semibold text-slate-800">{{ $triwulan ? 'Triwulan ' . $triwulan : 'Semua Triwulan' }}</span>
+                        <span class="font-bold text-slate-900 mt-0.5 block">{{ $triwulan && isset($triwulanLabels[(string) $triwulan]) ? $triwulanLabels[(string) $triwulan] : 'Semua Triwulan' }}</span>
                     </div>
-                    <div>
+                    <div class="rounded-xl bg-slate-50 border border-slate-200/70 p-3">
                         <span class="text-slate-400 block text-[11px]">Wilayah</span>
-                        <span class="font-semibold text-slate-800">{{ $wilayahId ? ($wilayahList->firstWhere('id', $wilayahId)?->nama ?? 'Terpilih') : 'Semua Wilayah' }}</span>
+                        <span class="font-bold text-slate-900 mt-0.5 block">{{ $wilayahId ? ($wilayahList->firstWhere('id', $wilayahId)?->nama ?? 'Terpilih') : 'Semua Wilayah' }}</span>
                     </div>
-                    <div>
+                    <div class="rounded-xl bg-slate-50 border border-slate-200/70 p-3">
                         <span class="text-slate-400 block text-[11px]">Sumber Program</span>
-                        <span class="font-semibold text-slate-800">{{ $sumberProgram ?: 'Semua Sumber Program' }}</span>
+                        <span class="font-bold text-slate-900 mt-0.5 block">{{ $sumberProgram ?: 'Semua Sumber Program' }}</span>
                     </div>
                 </div>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
-                <button type="button" @click="exportFormat = 'excel'" :class="exportFormat === 'excel' ? 'border-forest bg-forest/5 text-forest' : 'border-slate-200 text-slate-700'" class="p-3.5 rounded-xl border-2 text-left transition">
-                    <p class="text-xs font-bold">Excel (.xlsx)</p>
-                    <p class="text-[11px] text-slate-500 mt-0.5">Unduh tabel spreadsheet</p>
+                <button type="button"
+                        @click="exportFormat = 'excel'"
+                        :class="exportFormat === 'excel' ? 'border-forest bg-emerald-50/40 ring-1 ring-forest' : 'border-slate-200 hover:bg-slate-50'"
+                        class="p-4 rounded-2xl border text-left transition flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="file-spreadsheet" class="w-5 h-5 text-forest flex-shrink-0"></i>
+                        <div>
+                            <p class="text-xs font-extrabold text-slate-900">Excel (.xlsx)</p>
+                            <p class="text-[11px] text-slate-500 mt-0.5">Unduh rekap dalam format Excel.</p>
+                        </div>
+                    </div>
+                    <span class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                          :class="exportFormat === 'excel' ? 'bg-forest text-white' : 'border border-slate-300'">
+                        <i x-show="exportFormat === 'excel'" data-lucide="check" class="w-3 h-3"></i>
+                    </span>
                 </button>
-                <button type="button" @click="exportFormat = 'pdf'" :class="exportFormat === 'pdf' ? 'border-forest bg-forest/5 text-forest' : 'border-slate-200 text-slate-700'" class="p-3.5 rounded-xl border-2 text-left transition">
-                    <p class="text-xs font-bold">PDF (.pdf)</p>
-                    <p class="text-[11px] text-slate-500 mt-0.5">Unduh rekap dalam format PDF</p>
+
+                <button type="button"
+                        @click="exportFormat = 'pdf'"
+                        :class="exportFormat === 'pdf' ? 'border-forest bg-emerald-50/40 ring-1 ring-forest' : 'border-slate-200 hover:bg-slate-50'"
+                        class="p-4 rounded-2xl border text-left transition flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="file-text" class="w-5 h-5 text-forest flex-shrink-0"></i>
+                        <div>
+                            <p class="text-xs font-extrabold text-slate-900">PDF (.pdf)</p>
+                            <p class="text-[11px] text-slate-500 mt-0.5">Unduh rekap dalam format PDF.</p>
+                        </div>
+                    </div>
+                    <span class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                          :class="exportFormat === 'pdf' ? 'bg-forest text-white' : 'border border-slate-300'">
+                        <i x-show="exportFormat === 'pdf'" data-lucide="check" class="w-3 h-3"></i>
+                    </span>
                 </button>
             </div>
 
-            <p class="text-[11px] text-slate-500 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2">
-                NIK pada hasil ekspor ditampilkan tersamar. Aktivitas ini tercatat di audit log.
-            </p>
+            <div class="flex items-center gap-2.5 text-xs text-forest bg-emerald-50/80 border border-emerald-200/70 rounded-xl px-4 py-3">
+                <i data-lucide="shield-check" class="w-4 h-4 flex-shrink-0"></i>
+                <span>NIK pada hasil ekspor ditampilkan tersamar. Aktivitas ini tercatat di audit log.</span>
+            </div>
 
-            <div class="flex items-center justify-end gap-2 pt-2">
-                <button type="button" @click="openExportModal = false" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            <div class="flex items-center justify-end gap-2.5 pt-1">
+                <button type="button" @click="openExportModal = false" class="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
                     Batal
                 </button>
-                <button type="button" @click="window.print(); openExportModal = false" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold">
-                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
-                    Ekspor
+                <button type="button" @click="window.print(); openExportModal = false" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-sm transition">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>Ekspor</span>
                 </button>
             </div>
         </div>

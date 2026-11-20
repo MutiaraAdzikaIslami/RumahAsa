@@ -119,8 +119,26 @@ class BantuanIndexTest extends TestCase
         $this->actingAs($this->buatUser('verifikator'))
             ->get('/bantuan')
             ->assertOk()
+            ->assertSee('Progres Penerima Bantuan')
+            ->assertSee('DETAIL MONITORING')
+            ->assertSee('Review Penyelesaian Renovasi')
             ->assertSee('Warga Progres')
             ->assertSee('Dalam Renovasi')
             ->assertSee('65%');
+    }
+
+    public function test_verifikator_dan_pimpinan_bisa_melihat_rekap_dana(): void
+    {
+        $rumah = $this->buatRumah('Dalam Renovasi', 'Warga Rekap Dana');
+        $this->buatBantuan($rumah, '2026-10-01');
+
+        $this->actingAs($this->buatUser('verifikator'))
+            ->get('/bantuan/rekap-dana')
+            ->assertOk()
+            ->assertSee('Rekap Dana Bantuan')
+            ->assertSee('Ringkasan per Sumber Program')
+            ->assertSee('Rumah Penerima Dana')
+            ->assertSee('Warga Rekap Dana')
+            ->assertSee('APBD');
     }
 }
