@@ -4,9 +4,11 @@ namespace App\Modules\Rumah\Services;
 
 use App\Models\AuditLog;
 use App\Models\RumahWarga;
+use App\Models\User;
 use App\Models\Wilayah;
 use App\Modules\Core\Services\AuditLogger;
 use App\Modules\Core\Services\NikEncryptor;
+use App\Modules\Workflow\Services\StatusWorkflow;
 use Illuminate\Support\Facades\DB;
 
 class RumahService
@@ -14,11 +16,21 @@ class RumahService
     public function __construct(
         private readonly NikEncryptor $nikEncryptor,
         private readonly AuditLogger $auditLogger,
+        private readonly StatusWorkflow $statusWorkflow,
     ) {
     }
 
     public function createRumah(array $data, bool $isDraft = false): RumahWarga
     {
+        // Validasi Surveyor dan Wilayah Tugas jika keduanya diisi
+        if (!empty($data['surveyor_id']) && !empty($data['wilayah_id'])) {
+            $surveyor = User::with(['role', 'wilayah'])->find($data['surveyor_id']);
+            $kelurahan = Wilayah::find($data['wilayah_id']);
+            if ($surveyor && $kelurahan) {
+                $this->validateSurveyorWilayah($surveyor, $kelurahan);
+            }
+        }
+
         return DB::transaction(function () use ($data, $isDraft) {
             $wilayahId = null;
             if (!empty($data['wilayah_id'])) {
@@ -51,14 +63,15 @@ class RumahService
                 'penghasilan'          => $data['penghasilan'] ?? null,
                 'status_kepemilikan'   => $data['status_kepemilikan'] ?? null,
                 'alamat'               => isset($data['alamat']) && $data['alamat'] !== '' ? trim((string) $data['alamat']) : null,
-                'latitude'             => $data['latitude'] ?? null,
-                'longitude'            => $data['longitude'] ?? null,
                 'wilayah_id'           => $wilayahId,
                 'surveyor_id'          => (int) $data['surveyor_id'],
-                'status'               => $isDraft ? RumahWarga::STATUS_DRAF : RumahWarga::STATUS_MENUNGGU_DISURVEI,
             ];
 
-            $rumah = RumahWarga::create($payload);
+            $rumah = RumahWarga::create($payload)->fresh();
+
+            if (!$isDraft) {
+                $this->statusWorkflow->daftarkan($rumah);
+            }
 
             $this->auditLogger->catat(
                 aksi:      AuditLog::AKSI['RUMAH_CREATE'],
@@ -137,13 +150,19 @@ class RumahService
             );
         }
 
+        // Validasi Surveyor dan Wilayah Tugas jika surveyor diubah/diupdate
+        if (!empty($data['surveyor_id'])) {
+            $surveyor = User::with(['role', 'wilayah'])->find($data['surveyor_id']);
+            $targetWilayahId = !empty($data['wilayah_id']) ? (int) $data['wilayah_id'] : $rumah->wilayah_id;
+            $targetWilayah = $targetWilayahId ? Wilayah::find($targetWilayahId) : null;
+            if ($surveyor && $targetWilayah) {
+                $this->validateSurveyorWilayah($surveyor, $targetWilayah);
+            }
+        }
+
         $dataLama = $rumah->only(['nama_kepala_keluarga', 'jumlah_anggota', 'penghasilan', 'alamat', 'wilayah_id', 'status']);
 
-        DB::transaction(function () use ($rumah, $data, $isDraft) {
-            $nextStatus = $rumah->status;
-            if (!$isDraft && $rumah->status === RumahWarga::STATUS_DRAF) {
-                $nextStatus = RumahWarga::STATUS_MENUNGGU_DISURVEI;
-            }
+        DB::transaction(function () use ($rumah, $data, $isDraft, $dataLama) {
 
             $rumah->forceFill([
                 'nama_kepala_keluarga' => isset($data['nama_kepala_keluarga']) && $data['nama_kepala_keluarga'] !== ''
@@ -155,11 +174,12 @@ class RumahService
                 'penghasilan'          => $data['penghasilan'] ?? null,
                 'status_kepemilikan'   => $data['status_kepemilikan'] ?? null,
                 'alamat'               => isset($data['alamat']) && $data['alamat'] !== '' ? trim((string) $data['alamat']) : null,
-                'latitude'             => $data['latitude'] ?? null,
-                'longitude'            => $data['longitude'] ?? null,
                 'surveyor_id'          => (int) $data['surveyor_id'],
-                'status'               => $nextStatus,
             ])->save();
+
+            if (!$isDraft && $rumah->status === RumahWarga::STATUS_DRAF) {
+                $this->statusWorkflow->daftarkan($rumah);
+            }
 
             if (!empty($data['wilayah_id'])) {
                 if (!empty($data['rw_text']) && !empty($data['rt_text'])) {
@@ -197,6 +217,92 @@ class RumahService
         });
 
         return $rumah->fresh();
+    }
+
+    /**
+     * Memvalidasi apakah wilayah tugas surveyor mencakup wilayah rumah yang ditugaskan.
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function validateSurveyorWilayah(User $surveyor, Wilayah $wilayah): void
+    {
+        if ($surveyor->role?->kode !== 'surveyor') {
+            throw new \InvalidArgumentException("User {$surveyor->nama} bukan seorang surveyor.");
+        }
+
+        if (!$surveyor->is_aktif) {
+            throw new \InvalidArgumentException("Surveyor {$surveyor->nama} sedang berstatus non-aktif.");
+        }
+
+        $wilayahSurveyor = $surveyor->wilayah;
+        if (!$wilayahSurveyor) {
+            throw new \InvalidArgumentException(
+                "Surveyor {$surveyor->nama} belum memiliki wilayah tugas. Silakan atur wilayah tugas terlebih dahulu di Manajemen User."
+            );
+        }
+
+        $isMatch = false;
+
+        // 1. Jika ID wilayah sama persis
+        if ($wilayah->id === $wilayahSurveyor->id) {
+            $isMatch = true;
+        }
+        // 2. Jika path wilayah rumah diawali oleh path wilayah surveyor (hierarki ke bawah)
+        elseif (!empty($wilayah->path) && !empty($wilayahSurveyor->path) && str_starts_with($wilayah->path, rtrim($wilayahSurveyor->path, '/') . '/')) {
+            $isMatch = true;
+        }
+        // 3. Fallback jika path belum digenerate: cek parent_id
+        elseif ($wilayah->parent_id === $wilayahSurveyor->id) {
+            $isMatch = true;
+        }
+        // 4. Lingkup KECAMATAN: izinkan jika surveyor dan rumah berada di dalam satu kecamatan yang sama
+        else {
+            $kecamatanSurveyor = $this->resolveKecamatan($wilayahSurveyor);
+            $kecamatanRumah    = $this->resolveKecamatan($wilayah);
+
+            if ($kecamatanSurveyor && $kecamatanRumah && $kecamatanSurveyor->id === $kecamatanRumah->id) {
+                $isMatch = true;
+            }
+        }
+
+        if (!$isMatch) {
+            $kecamatanSurveyor = $this->resolveKecamatan($wilayahSurveyor);
+            $kecamatanRumah    = $this->resolveKecamatan($wilayah);
+            $namaKecSurveyor   = $kecamatanSurveyor ? "Kecamatan {$kecamatanSurveyor->nama}" : "{$wilayahSurveyor->nama} (" . ucfirst($wilayahSurveyor->tingkat) . ')';
+            $namaKecRumah      = $kecamatanRumah ? "Kecamatan {$kecamatanRumah->nama}" : "{$wilayah->nama} (" . ucfirst($wilayah->tingkat) . ')';
+
+            throw new \InvalidArgumentException(
+                "Surveyor {$surveyor->nama} bertugas di {$namaKecSurveyor}, berbeda dengan wilayah rumah di {$namaKecRumah} ({$wilayah->nama}). Harap pilih surveyor yang bertugas di {$namaKecRumah}."
+            );
+        }
+    }
+
+    /**
+     * Mengambil model Kecamatan dari suatu hierarki wilayah.
+     */
+    public function resolveKecamatan(Wilayah $wilayah): ?Wilayah
+    {
+        if ($wilayah->tingkat === Wilayah::TINGKAT_KECAMATAN) {
+            return $wilayah;
+        }
+
+        if (!empty($wilayah->path)) {
+            $segments = array_values(array_filter(explode('/', $wilayah->path)));
+            // Format path: /provinsi/kabupaten/kecamatan/... (indeks 2 adalah id kecamatan)
+            if (count($segments) >= 3) {
+                return Wilayah::find((int) $segments[2]);
+            }
+        }
+
+        $current = $wilayah;
+        while ($current) {
+            if ($current->tingkat === Wilayah::TINGKAT_KECAMATAN) {
+                return $current;
+            }
+            $current = $current->parent;
+        }
+
+        return null;
     }
 
     public function deleteRumah(RumahWarga $rumah): void

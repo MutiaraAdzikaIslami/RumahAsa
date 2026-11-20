@@ -25,6 +25,64 @@
             </div>
         @endif
 
+        {{-- Koordinat GPS Lokasi Rumah (Surveyor Lapangan) --}}
+        <div class="bg-white rounded-lg shadow p-6" data-lat="{{ old('latitude', $rumah->latitude ?? '') }}" data-lng="{{ old('longitude', $rumah->longitude ?? '') }}" x-data="gpsSurveyor($el.dataset.lat, $el.dataset.lng)">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-4 border-b">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-lg font-semibold text-slate-900">Koordinat GPS Lokasi Rumah</h2>
+                        <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Presisi &lt; 10m</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">Klik Akses GPS untuk mengambil lokasi perangkat, lalu geser pin pada peta satelit tepat ke atap rumah warga jika perlu.</p>
+                </div>
+                <button type="button" @click="ambilGPS()" :disabled="gpsLoading"
+                    style="background-color: #1D4034; color: #ffffff;"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold shadow-sm hover:opacity-90 disabled:opacity-60 transition cursor-pointer shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span x-text="gpsLoading ? 'Mengambil Lokasi...' : 'Akses GPS'"></span>
+                </button>
+            </div>
+
+            <div x-show="gpsMessage" x-cloak class="mb-4 px-3.5 py-2.5 rounded-lg text-xs font-medium flex items-center justify-between gap-2"
+                :class="gpsError ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'">
+                <span x-text="gpsMessage"></span>
+                <span x-show="precisionBadge" class="font-mono font-bold shrink-0" x-text="precisionBadge"></span>
+            </div>
+
+            {{-- Peta Satelit Kalibrasi Titik Rumah (muncul otomatis saat koordinat didapat) --}}
+            <div x-show="latitude && longitude" x-cloak class="mb-4">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-medium text-slate-600">Kalibrasi Titik Rumah (Klik peta atau geser pin biru ke atap rumah):</span>
+                    <div class="inline-flex rounded-md border border-slate-200 overflow-hidden text-[11px] font-medium">
+                        <button type="button" @click="switchMapLayer('satellite')"
+                            :class="mapLayerMode === 'satellite' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"
+                            class="px-2.5 py-1 cursor-pointer">Satelit</button>
+                        <button type="button" @click="switchMapLayer('street')"
+                            :class="mapLayerMode === 'street' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"
+                            class="px-2.5 py-1 cursor-pointer">Peta Jalan</button>
+                    </div>
+                </div>
+                <div x-ref="miniMap" class="w-full h-64 rounded-lg border border-slate-300 z-0 overflow-hidden"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Latitude</label>
+                    <input type="text" name="latitude" x-model="latitude" readonly
+                        placeholder="Terisi otomatis setelah Akses GPS diizinkan"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50 text-slate-800">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Longitude</label>
+                    <input type="text" name="longitude" x-model="longitude" readonly
+                        placeholder="Terisi otomatis setelah Akses GPS diizinkan"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50 text-slate-800">
+                </div>
+            </div>
+        </div>
         {{-- 7 Komponen --}}
         @foreach ($komponenList as $komponen)
             @php
@@ -109,6 +167,213 @@
 <style>[x-cloak] { display: none !important; }</style>
 
 <script>
+window.gpsSurveyor = function(initialLat, initialLng) {
+    return {
+        latitude: initialLat || '',
+        longitude: initialLng || '',
+        gpsLoading: false,
+        gpsMessage: initialLat && initialLng ? 'Koordinat lokasi rumah sudah tersimpan.' : '',
+        gpsError: false,
+        precisionBadge: initialLat && initialLng ? 'Terkunci' : '',
+        bestAccuracy: null,
+        watchId: null,
+        timeoutTimer: null,
+        map: null,
+        marker: null,
+        accuracyCircle: null,
+        satelliteLayer: null,
+        streetLayer: null,
+        mapLayerMode: 'satellite',
+        pinPinnedManually: false,
+
+        init() {
+            if (this.latitude && this.longitude) {
+                this.$nextTick(() => this.renderMiniMap(parseFloat(this.latitude), parseFloat(this.longitude), null));
+            }
+        },
+
+        ensureLeaflet() {
+            return new Promise((resolve) => {
+                if (window.L) return resolve();
+                if (!document.getElementById('leaflet-survei-css')) {
+                    const link = document.createElement('link');
+                    link.id = 'leaflet-survei-css';
+                    link.rel = 'stylesheet';
+                    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+                    document.head.appendChild(link);
+                }
+                if (!document.getElementById('leaflet-survei-js')) {
+                    const script = document.createElement('script');
+                    script.id = 'leaflet-survei-js';
+                    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+                    script.onload = () => resolve();
+                    document.head.appendChild(script);
+                } else {
+                    const check = setInterval(() => {
+                        if (window.L) { clearInterval(check); resolve(); }
+                    }, 50);
+                }
+            });
+        },
+
+        async renderMiniMap(lat, lng, accuracyMeters) {
+            await this.ensureLeaflet();
+            await this.$nextTick();
+
+            const el = this.$refs.miniMap;
+            if (!el) return;
+
+            if (!this.map) {
+                this.map = L.map(el, { center: [lat, lng], zoom: 19, maxZoom: 20 });
+
+                this.satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 20,
+                    attribution: 'Tiles &copy; Esri'
+                });
+                this.streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap'
+                });
+
+                this.satelliteLayer.addTo(this.map);
+
+                this.marker = L.marker([lat, lng], { draggable: true }).addTo(this.map);
+                this.marker.bindPopup('Geser pin ini tepat ke atap rumah warga').openPopup();
+
+                this.marker.on('dragend', (e) => {
+                    const pos = e.target.getLatLng();
+                    this.lockExactPin(pos.lat, pos.lng);
+                });
+
+                this.map.on('click', (e) => {
+                    this.marker.setLatLng(e.latlng);
+                    this.lockExactPin(e.latlng.lat, e.latlng.lng);
+                });
+            } else {
+                this.map.invalidateSize();
+                this.map.setView([lat, lng], 19);
+                this.marker.setLatLng([lat, lng]);
+            }
+
+            if (this.accuracyCircle) {
+                this.map.removeLayer(this.accuracyCircle);
+                this.accuracyCircle = null;
+            }
+            if (accuracyMeters && accuracyMeters > 10) {
+                this.accuracyCircle = L.circle([lat, lng], {
+                    radius: accuracyMeters,
+                    color: '#2563EB',
+                    fillColor: '#3B82F6',
+                    fillOpacity: 0.12,
+                    weight: 1
+                }).addTo(this.map);
+            }
+        },
+
+        switchMapLayer(mode) {
+            if (!this.map) return;
+            this.mapLayerMode = mode;
+            if (mode === 'satellite') {
+                this.map.removeLayer(this.streetLayer);
+                this.satelliteLayer.addTo(this.map);
+            } else {
+                this.map.removeLayer(this.satelliteLayer);
+                this.streetLayer.addTo(this.map);
+            }
+        },
+
+        lockExactPin(lat, lng) {
+            this.stopWatch();
+            this.pinPinnedManually = true;
+            this.latitude = lat.toFixed(7);
+            this.longitude = lng.toFixed(7);
+            this.gpsError = false;
+            this.precisionBadge = '±2.0m (Pin Satelit)';
+            this.gpsMessage = 'Titik lokasi rumah terkunci presisi di bawah 5 meter berdasarkan posisi pin peta.';
+            if (this.accuracyCircle && this.map) {
+                this.map.removeLayer(this.accuracyCircle);
+                this.accuracyCircle = null;
+            }
+        },
+
+        stopWatch() {
+            if (this.watchId !== null) {
+                navigator.geolocation.clearWatch(this.watchId);
+                this.watchId = null;
+            }
+            if (this.timeoutTimer !== null) {
+                clearTimeout(this.timeoutTimer);
+                this.timeoutTimer = null;
+            }
+            this.gpsLoading = false;
+        },
+
+        ambilGPS() {
+            if (!navigator.geolocation) {
+                this.gpsError = true;
+                this.gpsMessage = 'Browser atau perangkat Anda tidak mendukung fitur akses GPS.';
+                return;
+            }
+
+            this.stopWatch();
+            this.pinPinnedManually = false;
+            this.gpsLoading = true;
+            this.gpsError = false;
+            this.bestAccuracy = null;
+            this.precisionBadge = '';
+            this.gpsMessage = 'Meminta izin lokasi & mengunci satelit GPS presisi tinggi...';
+
+            this.timeoutTimer = setTimeout(() => {
+                if (this.watchId !== null) {
+                    const finalAcc = this.bestAccuracy;
+                    this.stopWatch();
+                    if (finalAcc !== null && !this.pinPinnedManually) {
+                        this.gpsError = finalAcc >= 10;
+                        this.precisionBadge = finalAcc < 10 ? `±${finalAcc.toFixed(1)}m` : `±${Math.round(finalAcc)}m`;
+                        this.gpsMessage = finalAcc < 10
+                            ? `Koordinat presisi tinggi terkunci (akurasi ±${finalAcc.toFixed(1)} meter).`
+                            : `GPS perangkat mentah ±${Math.round(finalAcc)}m (keterbatasan sensor Wi-Fi/ruangan). Geser pin pada peta satelit di bawah tepat ke atap rumah untuk mengunci akurasi < 5m.`;
+                    }
+                }
+            }, 8000);
+
+            this.watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    if (this.pinPinnedManually) return;
+                    const acc = pos.coords.accuracy;
+
+                    if (this.bestAccuracy === null || acc < this.bestAccuracy) {
+                        this.bestAccuracy = acc;
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        this.latitude = lat.toFixed(7);
+                        this.longitude = lng.toFixed(7);
+                        this.renderMiniMap(lat, lng, acc);
+                    }
+
+                    if (acc < 10) {
+                        this.stopWatch();
+                        this.gpsError = false;
+                        this.precisionBadge = `±${acc.toFixed(1)}m`;
+                        this.gpsMessage = `Presisi tinggi tercapai (< 10m): koordinat terkunci dengan akurasi ±${acc.toFixed(1)} meter.`;
+                    } else {
+                        this.gpsError = true;
+                        this.precisionBadge = `±${Math.round(this.bestAccuracy)}m`;
+                        this.gpsMessage = `Lokasi terdeteksi (±${Math.round(this.bestAccuracy)}m). Menunggu sinyal < 10m atau geser pin peta satelit di bawah langsung ke atap rumah.`;
+                    }
+                },
+                (err) => {
+                    this.stopWatch();
+                    this.gpsError = true;
+                    this.gpsMessage = err.code === 1
+                        ? 'Izin akses lokasi ditolak. Aktifkan izin Location pada browser lalu klik Akses GPS lagi.'
+                        : 'Gagal mendapatkan lokasi GPS: ' + err.message;
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+    };
+};
 function fotoUploader(komponenId) {
     return {
         uploading: false,

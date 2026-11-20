@@ -165,25 +165,6 @@
             </div>
         </div>
 
-        {{-- GPS --}}
-        <div>
-            <h2 class="text-lg font-semibold text-slate-900 mb-3 pb-2 border-b">Koordinat GPS</h2>
-            <div class="flex items-center gap-3 mb-3">
-                <button type="button" @click="ambilGPS()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">Ambil GPS</button>
-                <span x-show="gpsLoading" class="text-sm text-slate-500">Mengambil lokasi...</span>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Latitude</label>
-                    <input type="text" name="latitude" x-model="latitude" readonly class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Longitude</label>
-                    <input type="text" name="longitude" x-model="longitude" readonly class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono bg-slate-50">
-                </div>
-            </div>
-        </div>
-
         <div class="flex justify-between pt-4 border-t">
             <a href="{{ route('rumah.show', $rumah) }}" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Batal</a>
             <div class="space-x-2">
@@ -218,9 +199,6 @@ function rumahForm() {
         kecamatanOptions: [],
         kelurahanOptions: initialKelurahan,
         loadingKelurahan: false,
-        latitude: @json((string) old('latitude', $rumah->latitude ?? '')),
-        longitude: @json((string) old('longitude', $rumah->longitude ?? '')),
-        gpsLoading: false,
 
         async init() {
             if (this.kabupatenId) {
@@ -283,26 +261,6 @@ function rumahForm() {
             } finally {
                 this.loadingKelurahan = false;
             }
-        },
-
-        ambilGPS() {
-            if (!navigator.geolocation) {
-                alert('Browser tidak mendukung GPS.');
-                return;
-            }
-            this.gpsLoading = true;
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    this.latitude = pos.coords.latitude.toFixed(7);
-                    this.longitude = pos.coords.longitude.toFixed(7);
-                    this.gpsLoading = false;
-                },
-                (err) => {
-                    alert('Gagal mengambil GPS: ' + err.message);
-                    this.gpsLoading = false;
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
         },
     };
 }

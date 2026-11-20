@@ -53,12 +53,22 @@ class SurveiController extends Controller
 
         $isDraft = $request->input('action') === 'draft';
 
-        $rules = [];
+        $rules = [
+            'latitude'  => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+        ];
         foreach ($request->input('komponen', []) as $komponenId => $data) {
             $rules["komponen.{$komponenId}.opsi_kondisi_id"] = 'nullable|exists:opsi_kondisi,id';
             $rules["komponen.{$komponenId}.catatan"] = 'nullable|string';
         }
         $validated = $request->validate($rules);
+
+        if ($request->filled('latitude') && $request->filled('longitude')) {
+            $rumah->update([
+                'latitude'  => $validated['latitude'],
+                'longitude' => $validated['longitude'],
+            ]);
+        }
 
         // FIX: Pakai $request->input('komponen', []) bukan $validated['komponen']
         $komponenData = $request->input('komponen', []);

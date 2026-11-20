@@ -42,6 +42,7 @@ class StatusWorkflow
             RumahWarga::STATUS_DIAJUKAN,
         ],
         RumahWarga::STATUS_DRAF => [
+            RumahWarga::STATUS_MENUNGGU_DISURVEI,
             RumahWarga::STATUS_DIAJUKAN,
         ],
         RumahWarga::STATUS_DIAJUKAN => [
@@ -54,12 +55,15 @@ class StatusWorkflow
         ],
         RumahWarga::STATUS_PENERIMA_BANTUAN => [
             RumahWarga::STATUS_DALAM_RENOVASI,
+            RumahWarga::STATUS_LAYAK_HUNI,
         ],
         RumahWarga::STATUS_DALAM_RENOVASI => [
             RumahWarga::STATUS_SELESAI,
         ],
-        // Final states — tidak ada transisi keluar
-        RumahWarga::STATUS_LAYAK_HUNI => [],
+        // Layak Huni hanya dapat direvisi ke Penerima Bantuan sebelum renovasi
+        RumahWarga::STATUS_LAYAK_HUNI => [
+            RumahWarga::STATUS_PENERIMA_BANTUAN,
+        ],
         RumahWarga::STATUS_SELESAI    => [],
     ];
 
@@ -80,6 +84,20 @@ class StatusWorkflow
     /**
      * Surveyor mulai mengisi survei (Menunggu Disurvei -> Draf).
      */
+    /**
+     * FR-09 / FR-10: Admin mendaftarkan rumah warga (Draf -> Menunggu Disurvei).
+     */
+    public function daftarkan(RumahWarga $rumah, ?User $user = null): void
+    {
+        $this->transition(
+            rumah:     $rumah,
+            to:        RumahWarga::STATUS_MENUNGGU_DISURVEI,
+            user:      $user,
+            catatan:   'Rumah didaftarkan dan menunggu survei lapangan',
+            auditAksi: AuditLog::AKSI['STATUS_CHANGE'],
+        );
+    }
+
     public function mulaiSurvei(RumahWarga $rumah, ?User $user = null): void
     {
         if ($rumah->status === RumahWarga::STATUS_MENUNGGU_DISURVEI) {

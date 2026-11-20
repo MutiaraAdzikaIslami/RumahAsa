@@ -210,4 +210,45 @@ class StatusWorkflowTest extends TestCase
         $this->assertFalse($this->workflow->canTransition('Layak Huni', 'Draf'));   // final
         $this->assertFalse($this->workflow->canTransition('Selesai', 'Draf'));      // final
     }
+
+    public function test_draf_bisa_didaftarkan_ke_menunggu_disurvei(): void
+    {
+        $rumah = $this->makeRumah(RumahWarga::STATUS_DRAF);
+        $admin = $this->makeUser('admin');
+
+        $this->workflow->daftarkan($rumah, $admin);
+
+        $this->assertSame(RumahWarga::STATUS_MENUNGGU_DISURVEI, $rumah->fresh()->status);
+        $this->assertDatabaseHas('riwayat_status', [
+            'rumah_id'    => $rumah->id,
+            'status_dari' => RumahWarga::STATUS_DRAF,
+            'status_ke'   => RumahWarga::STATUS_MENUNGGU_DISURVEI,
+            'user_id'     => $admin->id,
+        ]);
+    }
+
+    public function test_diajukan_bisa_diminta_perbaikan_dan_diajukan_kembali(): void
+    {
+        $rumah = $this->makeRumah(RumahWarga::STATUS_DIAJUKAN);
+        $verifikator = $this->makeUser('verifikator');
+        $surveyor = $this->makeUser('surveyor');
+
+        $this->workflow->mintaPerbaikan($rumah, 'Foto tampak depan buram', $verifikator);
+        $this->assertSame(RumahWarga::STATUS_PERLU_PERBAIKAN, $rumah->fresh()->status);
+
+        $this->workflow->ajukan($rumah->fresh(), $surveyor);
+        $this->assertSame(RumahWarga::STATUS_DIAJUKAN, $rumah->fresh()->status);
+    }
+
+    public function test_revisi_keputusan_antara_layak_huni_dan_penerima_bantuan(): void
+    {
+        $rumah = $this->makeRumah(RumahWarga::STATUS_LAYAK_HUNI);
+        $verifikator = $this->makeUser('verifikator');
+
+        $this->workflow->revisiKeputusan($rumah, 'Revisi setelah verifikasi ulang', $verifikator);
+        $this->assertSame(RumahWarga::STATUS_PENERIMA_BANTUAN, $rumah->fresh()->status);
+
+        $this->workflow->revisiKeputusan($rumah->fresh(), 'Kembalikan ke layak huni', $verifikator);
+        $this->assertSame(RumahWarga::STATUS_LAYAK_HUNI, $rumah->fresh()->status);
+    }
 }

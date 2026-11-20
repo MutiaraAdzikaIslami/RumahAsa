@@ -160,7 +160,7 @@ class HeatmapController extends Controller
         });
 
         // 3. Lapisan: Sedang Renovasi (Dalam Renovasi)
-        $sedangRenovasiQuery = (clone $baseQuery)->where('status', RumahWarga::STATUS_DALAM_RENOVASI);
+        $sedangRenovasiQuery = (clone $baseQuery)->whereIn('status', [RumahWarga::STATUS_PENERIMA_BANTUAN, RumahWarga::STATUS_DALAM_RENOVASI]);
         if ($sumberProgram) {
             $sedangRenovasiQuery->whereHas('penerimaBantuan', function ($q) use ($sumberProgram) {
                 $q->where('sumber_program', $sumberProgram);
@@ -250,6 +250,7 @@ class HeatmapController extends Controller
                 ])
                 ->orWhere(function ($q2) use ($sumberProgram) {
                     $q2->whereIn('status', [
+                        RumahWarga::STATUS_PENERIMA_BANTUAN,
                         RumahWarga::STATUS_DALAM_RENOVASI,
                         RumahWarga::STATUS_SELESAI,
                     ]);

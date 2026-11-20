@@ -91,11 +91,23 @@ class RumahController extends Controller
     {
         Gate::authorize('create', RumahWarga::class);
 
-        $isDraft = $request->isDraftSubmission();
-        $rumah   = $this->rumahService->createRumah($request->validated(), $isDraft);
+        try {
+            $isDraft = $request->isDraftSubmission();
+            $rumah   = $this->rumahService->createRumah($request->validated(), $isDraft);
 
-        return redirect()->route('rumah.show', $rumah)
-            ->with('success', $isDraft ? 'Draf data rumah berhasil disimpan.' : 'Data rumah berhasil disimpan.');
+            return redirect()->route('rumah.show', $rumah)
+                ->with('success', $isDraft ? 'Draf data rumah berhasil disimpan.' : 'Data rumah berhasil disimpan.');
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
+            return back()
+                ->withInput()
+                ->withErrors(['surveyor_id' => $e->getMessage()])
+                ->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            report($e);
+            return back()
+                ->withInput()
+                ->with('error', 'Terjadi kesalahan sistem saat menyimpan data rumah: ' . $e->getMessage());
+        }
     }
 
     public function show(RumahWarga $rumah)
@@ -207,10 +219,22 @@ class RumahController extends Controller
     {
         Gate::authorize('update', $rumah);
 
-        $isDraft = $request->isDraftSubmission();
-        $rumah   = $this->rumahService->updateRumah($rumah, $request->validated(), $isDraft);
+        try {
+            $isDraft = $request->isDraftSubmission();
+            $rumah   = $this->rumahService->updateRumah($rumah, $request->validated(), $isDraft);
 
-        return redirect()->route('rumah.show', $rumah)
-            ->with('success', $isDraft ? 'Draf perubahan berhasil disimpan.' : 'Data rumah berhasil diperbarui.');
+            return redirect()->route('rumah.show', $rumah)
+                ->with('success', $isDraft ? 'Draf perubahan berhasil disimpan.' : 'Data rumah berhasil diperbarui.');
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
+            return back()
+                ->withInput()
+                ->withErrors(['surveyor_id' => $e->getMessage()])
+                ->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            report($e);
+            return back()
+                ->withInput()
+                ->with('error', 'Terjadi kesalahan sistem saat memperbarui data rumah: ' . $e->getMessage());
+        }
     }
 }
