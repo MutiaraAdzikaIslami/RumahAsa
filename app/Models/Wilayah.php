@@ -19,10 +19,12 @@ class Wilayah extends Model
 
     protected $casts = ['is_aktif' => 'boolean'];
 
-    public const TINGKAT_KECAMATAN = 'kecamatan';
-    public const TINGKAT_KELURAHAN = 'kelurahan';
-    public const TINGKAT_RW        = 'rw';
-    public const TINGKAT_RT        = 'rt';
+    public const TINGKAT_PROVINSI       = 'provinsi';
+    public const TINGKAT_KABUPATEN_KOTA = 'kabupaten';
+    public const TINGKAT_KECAMATAN      = 'kecamatan';
+    public const TINGKAT_KELURAHAN      = 'kelurahan';
+    public const TINGKAT_RW             = 'rw';
+    public const TINGKAT_RT             = 'rt';
 
     public const URUTAN_TINGKAT = [
         self::TINGKAT_KECAMATAN => 1,

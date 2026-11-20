@@ -109,7 +109,10 @@ class RumahController extends Controller
             'alamat'                => $isDraft ? 'nullable|string' : 'required|string',
             'latitude'              => 'nullable|numeric',
             'longitude'             => 'nullable|numeric',
-            'wilayah_id'            => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
+            'wilayah_id'            => $isDraft ? 'nullable' : 'required_without:kelurahan_id|nullable|exists:wilayah,id',
+            'kelurahan_id'          => 'nullable|exists:wilayah,id',
+            'rw_text'               => 'nullable|string|max:10',
+            'rt_text'               => 'nullable|string|max:10',
             // FIX: surveyor_id wajib diisi oleh Admin
             'surveyor_id'           => 'required|exists:users,id',
         ];
@@ -117,7 +120,21 @@ class RumahController extends Controller
         $validated = $request->validate($rules, [
             'nik.size' => 'NIK harus 16 digit.',
             'no_kk.size' => 'No. KK harus 16 digit.',
+            'wilayah_id.required_without' => 'Wilayah kelurahan/RT wajib dipilih.',
         ]);
+
+        // Resolusi RT/RW hierarki sesuai Kemendagri
+        if ($request->filled('kelurahan_id') && $request->filled('rt_text') && $request->filled('rw_text')) {
+            $rt = $this->resolveOrCreateRtWilayah(
+                (int) $request->input('kelurahan_id'),
+                (string) $request->input('rt_text'),
+                (string) $request->input('rw_text')
+            );
+            $validated['wilayah_id'] = $rt->id;
+        } elseif ($request->filled('kelurahan_id') && empty($validated['wilayah_id'])) {
+            $validated['wilayah_id'] = (int) $request->input('kelurahan_id');
+        }
+        unset($validated['kelurahan_id'], $validated['rw_text'], $validated['rt_text']);
 
         $nikEncryptor = app(NikEncryptor::class);
         if (!empty($validated['nik'])) {
@@ -151,6 +168,44 @@ class RumahController extends Controller
 
         return redirect()->route('rumah.show', $rumah)
             ->with('success', $isDraft ? 'Draf berhasil disimpan.' : 'Data rumah berhasil disimpan.');
+    }
+
+    public function resolveOrCreateRtWilayah(int $parentKelurahanId, string $rtText, string $rwText): Wilayah
+    {
+        $parent = Wilayah::findOrFail($parentKelurahanId);
+
+        $rwText = trim($rwText);
+        $rtText = trim($rtText);
+
+        $rwNama = 'RW ' . mb_strtoupper($rwText);
+        $rw = Wilayah::firstOrCreate(
+            ['parent_id' => $parent->id, 'nama' => $rwNama],
+            [
+                'kode'     => 'RW-' . $parent->id . '-' . mb_strtoupper($rwText),
+                'tingkat'  => Wilayah::TINGKAT_RW,
+                'path'     => null,
+                'is_aktif' => true,
+            ],
+        );
+        if (blank($rw->path)) {
+            $rw->forceFill(['path' => ($parent->path ?: '/' . $parent->id) . '/' . $rw->id])->save();
+        }
+
+        $rtNama = 'RT ' . mb_strtoupper($rtText);
+        $rt = Wilayah::firstOrCreate(
+            ['parent_id' => $rw->id, 'nama' => $rtNama],
+            [
+                'kode'     => 'RT-' . $rw->id . '-' . mb_strtoupper($rtText),
+                'tingkat'  => Wilayah::TINGKAT_RT,
+                'path'     => null,
+                'is_aktif' => true,
+            ],
+        );
+        if (blank($rt->path)) {
+            $rt->forceFill(['path' => ($rw->path ?: '/' . $rw->id) . '/' . $rt->id])->save();
+        }
+
+        return $rt->fresh();
     }
 
     public function show(RumahWarga $rumah)
@@ -204,11 +259,27 @@ class RumahController extends Controller
             'alamat'                => $isDraft ? 'nullable|string' : 'required|string',
             'latitude'              => 'nullable|numeric',
             'longitude'             => 'nullable|numeric',
-            'wilayah_id'            => $isDraft ? 'nullable|exists:wilayah,id' : 'required|exists:wilayah,id',
+            'wilayah_id'            => $isDraft ? 'nullable' : 'required_without:kelurahan_id|nullable|exists:wilayah,id',
+            'kelurahan_id'          => 'nullable|exists:wilayah,id',
+            'rw_text'               => 'nullable|string|max:10',
+            'rt_text'               => 'nullable|string|max:10',
             'surveyor_id'           => 'required|exists:users,id',
         ];
 
         $validated = $request->validate($rules);
+
+        // Resolusi RT/RW hierarki sesuai Kemendagri
+        if ($request->filled('kelurahan_id') && $request->filled('rt_text') && $request->filled('rw_text')) {
+            $rt = $this->resolveOrCreateRtWilayah(
+                (int) $request->input('kelurahan_id'),
+                (string) $request->input('rt_text'),
+                (string) $request->input('rw_text')
+            );
+            $validated['wilayah_id'] = $rt->id;
+        } elseif ($request->filled('kelurahan_id') && empty($validated['wilayah_id'])) {
+            $validated['wilayah_id'] = (int) $request->input('kelurahan_id');
+        }
+        unset($validated['kelurahan_id'], $validated['rw_text'], $validated['rt_text']);
 
         $nikEncryptor = app(NikEncryptor::class);
         if (!empty($validated['nik'])) {

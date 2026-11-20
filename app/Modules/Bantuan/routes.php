@@ -4,6 +4,7 @@ use App\Modules\Bantuan\Http\Controllers\BantuanController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [BantuanController::class, 'index'])->middleware('role:verifikator|admin|pimpinan')->name('index');
+Route::get('/rekap-dana', [BantuanController::class, 'rekap'])->middleware('role:verifikator|admin|pimpinan')->name('rekap');
 
 // Hanya Verifikator yang boleh mencatat penyaluran
 Route::middleware('role:verifikator')->group(function () {

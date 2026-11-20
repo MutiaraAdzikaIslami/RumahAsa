@@ -67,58 +67,63 @@
                     <input type="number" name="luas_rumah" value="{{ old('luas_rumah') }}" step="0.01" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" placeholder="Mis. 36.50">
                 </div>
 
-                {{-- Cascading Wilayah: Kabupaten/Kota -> Kecamatan -> Kelurahan -> RT --}}
-                <div x-data="wilayahCascade(@json($kabupatenList), @json($kecamatanDirect), {{ old('wilayah_id') ?? 'null' }}, @json($selectedWilayah))" class="md:col-span-2 space-y-3">
-                    <p class="text-sm font-medium text-slate-700">Wilayah Administratif <span class="text-red-500">*</span></p>
+                {{-- Cascading Wilayah: Kabupaten/Kota -> Kecamatan -> Kelurahan -> RW & RT --}}
+                <div class="md:col-span-2 space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-4" id="wilayahCascadeWrapper">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-800">Lokasi &amp; Wilayah Administratif <span class="text-red-500">*</span></p>
+                        <p class="text-xs text-slate-500">Pilih wilayah berjenjang sesuai data Kemendagri (Kabupaten &rarr; Kecamatan &rarr; Kelurahan), lalu isi nomor RW dan RT.</p>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {{-- Kabupaten / Kota --}}
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">Kabupaten/Kota <span class="text-red-500">*</span></label>
-                            <select x-model="selectedKabupaten" @change="loadKecamatan()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Kabupaten/Kota <span class="text-red-500">*</span></label>
+                            <select id="kabupatenSelect" name="kabupaten_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-forest focus:outline-none">
                                 <option value="">Pilih Kabupaten/Kota...</option>
-                                <template x-for="k in kabupatenList" :key="k.id">
-                                    <option :value="k.id" x-text="k.nama"></option>
-                                </template>
+                                @foreach ($kabupatenList as $kab)
+                                    <option value="{{ $kab->id }}" {{ old('kabupaten_id') == $kab->id ? 'selected' : '' }}>{{ $kab->nama }}</option>
+                                @endforeach
                             </select>
                         </div>
+
                         {{-- Kecamatan --}}
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">Kecamatan <span class="text-red-500">*</span></label>
-                            <select x-model="selectedKecamatan" @change="loadKelurahan()" :disabled="!selectedKabupaten && kecamatanList.length === 0" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm disabled:bg-slate-100">
-                                <option value="">Pilih Kecamatan...</option>
-                                <template x-for="k in kecamatanList" :key="k.id">
-                                    <option :value="k.id" x-text="k.nama"></option>
-                                </template>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Kecamatan <span class="text-red-500">*</span></label>
+                            <select id="kecamatanSelect" name="kecamatan_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-forest focus:outline-none disabled:bg-slate-100 disabled:text-slate-400" {{ empty($kecamatanDirect) && !old('kabupaten_id') ? 'disabled' : '' }}>
+                                <option value="">{{ old('kabupaten_id') ? 'Pilih Kecamatan...' : 'Pilih kabupaten dulu' }}</option>
+                                @if (!empty($kecamatanDirect))
+                                    @foreach ($kecamatanDirect as $kec)
+                                        <option value="{{ $kec->id }}" {{ old('kecamatan_id') == $kec->id ? 'selected' : '' }}>{{ $kec->nama }}</option>
+                                    @endforeach
+                                @endif
                             </select>
                         </div>
+
                         {{-- Kelurahan / Desa --}}
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">Kelurahan/Desa <span class="text-red-500">*</span></label>
-                            <select x-model="selectedKelurahan" @change="loadRt()" :disabled="!selectedKecamatan" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm disabled:bg-slate-100">
-                                <option value="">Pilih Kelurahan...</option>
-                                <template x-for="k in kelurahanList" :key="k.id">
-                                    <option :value="k.id" x-text="k.nama"></option>
-                                </template>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Kelurahan/Desa <span class="text-red-500">*</span></label>
+                            <select id="kelurahanSelect" name="kelurahan_id" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-forest focus:outline-none disabled:bg-slate-100 disabled:text-slate-400" {{ !old('kecamatan_id') ? 'disabled' : '' }}>
+                                <option value="">{{ old('kecamatan_id') ? 'Pilih Kelurahan...' : 'Pilih kecamatan dulu' }}</option>
                             </select>
                         </div>
                     </div>
 
-                    {{-- RT / RW pilihan (jika terdaftar di database) --}}
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3" x-show="rtList.length > 0">
+                    {{-- RW & RT Manual Input (Sesuai Kemendagri & Mockup Abel) --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
                         <div>
-                            <label class="block text-xs text-slate-500 mb-1">Pilih RT (jika terdaftar di sistem)</label>
-                            <select x-model="selectedRt" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-                                <option value="">Gunakan Kelurahan di atas (atau pilih RT)</option>
-                                <template x-for="r in rtList" :key="r.id">
-                                    <option :value="r.id" x-text="r.nama + ' (' + r.kode + ')'"></option>
-                                </template>
-                            </select>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">RW <span class="text-red-500">*</span></label>
+                            <input type="text" name="rw_text" id="rwTextInput" value="{{ old('rw_text') }}" maxlength="10" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white placeholder-slate-400 focus:ring-2 focus:ring-forest focus:outline-none" placeholder="cth: 005 atau 05">
+                            <p class="text-[11px] text-slate-400 mt-0.5">Nomor Rukun Warga</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">RT <span class="text-red-500">*</span></label>
+                            <input type="text" name="rt_text" id="rtTextInput" value="{{ old('rt_text') }}" maxlength="10" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white placeholder-slate-400 focus:ring-2 focus:ring-forest focus:outline-none" placeholder="cth: 003 atau 01">
+                            <p class="text-[11px] text-slate-400 mt-0.5">Nomor Rukun Tetangga</p>
                         </div>
                     </div>
 
-                    {{-- Hidden input yang dikirim ke controller sebagai wilayah_id --}}
-                    <input type="hidden" name="wilayah_id" :value="effectiveWilayahId">
-                    <p class="text-xs text-slate-400">Hierarki: Kabupaten/Kota &rarr; Kecamatan &rarr; Kelurahan/Desa &rarr; RT.</p>
+                    {{-- Hidden input fallback jika wilayah_id diset langsung --}}
+                    <input type="hidden" name="wilayah_id" id="wilayahIdFallback" value="{{ old('wilayah_id') }}">
                 </div>
 
                 <div class="md:col-span-2">
@@ -212,146 +217,72 @@ function rumahForm() {
     };
 }
 
-function wilayahCascade(kabupatenList, kecamatanDirect, initialWilayahId, selectedWilayah) {
-    return {
-        kabupatenList: kabupatenList || [],
-        kecamatanDirect: kecamatanDirect || [],
-        kecamatanList: [],
-        kelurahanList: [],
-        rtList: [],
+document.addEventListener('DOMContentLoaded', function () {
+    const kabSelect = document.getElementById('kabupatenSelect');
+    const kecSelect = document.getElementById('kecamatanSelect');
+    const kelSelect = document.getElementById('kelurahanSelect');
 
-        selectedKabupaten: '',
-        selectedKecamatan: '',
-        selectedKelurahan: '',
-        selectedRt: '',
+    if (!kabSelect) return;
 
-        loadingKecamatan: false,
-        loadingKelurahan: false,
-        loadingRt: false,
+    kabSelect.addEventListener('change', async function () {
+        const kabId = this.value;
+        kecSelect.innerHTML = '<option value="">Memuat kecamatan...</option>';
+        kecSelect.disabled = true;
+        kelSelect.innerHTML = '<option value="">Pilih kecamatan dulu</option>';
+        kelSelect.disabled = true;
 
-        async init() {
-            if (this.kecamatanDirect.length > 0 && this.kabupatenList.length === 0) {
-                this.kecamatanList = [...this.kecamatanDirect];
-            }
-
-            if (selectedWilayah) {
-                await this.preloadHierarchy(selectedWilayah, initialWilayahId);
-            }
-        },
-
-        async preloadHierarchy(w, targetId) {
-            let chain = [];
-            let curr = w;
-            while (curr) {
-                chain.unshift(curr);
-                curr = curr.parent;
-            }
-
-            let kab = chain.find(x => x.tingkat === 'kabupaten');
-            let kec = chain.find(x => x.tingkat === 'kecamatan');
-            let kel = chain.find(x => x.tingkat === 'kelurahan');
-            let rt  = chain.find(x => x.tingkat === 'rt' || x.tingkat === 'rw');
-
-            if (kab) {
-                this.selectedKabupaten = kab.id;
-                await this.loadKecamatan();
-            }
-            if (kec) {
-                this.selectedKecamatan = kec.id;
-                await this.loadKelurahan();
-            }
-            if (kel) {
-                this.selectedKelurahan = kel.id;
-                await this.loadRt();
-            }
-            if (rt) {
-                this.selectedRt = rt.id;
-            } else if (targetId) {
-                this.selectedRt = targetId;
-            }
-        },
-
-        async loadKecamatan() {
-            this.kecamatanList = [];
-            this.kelurahanList = [];
-            this.rtList = [];
-            this.selectedKecamatan = '';
-            this.selectedKelurahan = '';
-            this.selectedRt = '';
-
-            if (!this.selectedKabupaten) {
-                if (this.kecamatanDirect.length > 0) {
-                    this.kecamatanList = [...this.kecamatanDirect];
-                }
-                return;
-            }
-
-            this.loadingKecamatan = true;
-            try {
-                let res = await fetch(`/wilayah/${this.selectedKabupaten}/children`);
-                if (res.ok) {
-                    this.kecamatanList = await res.json();
-                }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                this.loadingKecamatan = false;
-            }
-        },
-
-        async loadKelurahan() {
-            this.kelurahanList = [];
-            this.rtList = [];
-            this.selectedKelurahan = '';
-            this.selectedRt = '';
-
-            if (!this.selectedKecamatan) return;
-
-            this.loadingKelurahan = true;
-            try {
-                let res = await fetch(`/wilayah/${this.selectedKecamatan}/children`);
-                if (res.ok) {
-                    let data = await res.json();
-                    let kel = data.filter(x => x.tingkat === 'kelurahan');
-                    let rt  = data.filter(x => x.tingkat === 'rt' || x.tingkat === 'rw');
-                    this.kelurahanList = kel;
-                    if (rt.length > 0) {
-                        this.rtList = rt;
-                    }
-                }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                this.loadingKelurahan = false;
-            }
-        },
-
-        async loadRt() {
-            this.rtList = [];
-            this.selectedRt = '';
-
-            if (!this.selectedKelurahan) return;
-
-            this.loadingRt = true;
-            try {
-                let res = await fetch(`/wilayah/${this.selectedKelurahan}/children`);
-                if (res.ok) {
-                    this.rtList = await res.json();
-                }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                this.loadingRt = false;
-            }
-        },
-
-        get effectiveWilayahId() {
-            if (this.selectedRt) return this.selectedRt;
-            if (this.selectedKelurahan) return this.selectedKelurahan;
-            if (this.selectedKecamatan) return this.selectedKecamatan;
-            return '';
+        if (!kabId) {
+            kecSelect.innerHTML = '<option value="">Pilih kabupaten dulu</option>';
+            return;
         }
-    };
-}
+
+        try {
+            const res = await fetch(`/wilayah/${kabId}/children`);
+            if (res.ok) {
+                const data = await res.json();
+                kecSelect.innerHTML = '<option value="">Pilih Kecamatan...</option>';
+                data.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = item.nama;
+                    kecSelect.appendChild(opt);
+                });
+                kecSelect.disabled = false;
+            }
+        } catch (err) {
+            console.error('Gagal memuat kecamatan:', err);
+            kecSelect.innerHTML = '<option value="">Gagal memuat data</option>';
+        }
+    });
+
+    kecSelect.addEventListener('change', async function () {
+        const kecId = this.value;
+        kelSelect.innerHTML = '<option value="">Memuat kelurahan...</option>';
+        kelSelect.disabled = true;
+
+        if (!kecId) {
+            kelSelect.innerHTML = '<option value="">Pilih kecamatan dulu</option>';
+            return;
+        }
+
+        try {
+            const res = await fetch(`/wilayah/${kecId}/children`);
+            if (res.ok) {
+                const data = await res.json();
+                kelSelect.innerHTML = '<option value="">Pilih Kelurahan/Desa...</option>';
+                data.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = item.id;
+                    opt.textContent = item.nama;
+                    kelSelect.appendChild(opt);
+                });
+                kelSelect.disabled = false;
+            }
+        } catch (err) {
+            console.error('Gagal memuat kelurahan:', err);
+            kelSelect.innerHTML = '<option value="">Gagal memuat data</option>';
+        }
+    });
+});
 </script>
 @endsection

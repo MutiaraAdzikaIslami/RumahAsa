@@ -63,4 +63,72 @@ class BantuanController extends Controller
 
         return view('bantuan.index', compact('rumah', 'wilayahList', 'totalPenerima'));
     }
+
+    /**
+     * FR-28: Rekap Dana per Triwulan (Verifikator, Pimpinan, Admin).
+     */
+    public function rekap(Request $request)
+    {
+        $tahun = (int) $request->query('tahun', now()->year);
+        $triwulan = $request->query('triwulan');
+        $sumberProgram = $request->query('sumber_program');
+        $wilayahId = $request->query('wilayah_id');
+
+        $query = \App\Models\PenerimaBantuan::with(['rumah.wilayah'])
+            ->whereYear('tanggal_bantuan', $tahun);
+
+        if ($triwulan && in_array((int) $triwulan, [1, 2, 3, 4], true)) {
+            $bulanMulai = ((int) $triwulan - 1) * 3 + 1;
+            $bulanAkhir = $bulanMulai + 2;
+            $query->whereRaw('EXTRACT(MONTH FROM tanggal_bantuan) BETWEEN ? AND ?', [$bulanMulai, $bulanAkhir]);
+        }
+
+        if ($sumberProgram) {
+            $query->where('sumber_program', $sumberProgram);
+        }
+
+        if ($wilayahId) {
+            $wilayah = Wilayah::find($wilayahId);
+            if ($wilayah) {
+                $query->whereHas('rumah.wilayah', function ($q) use ($wilayah) {
+                    $q->where('id', $wilayah->id)
+                      ->orWhere('path', 'like', $wilayah->path . '/%');
+                });
+            }
+        }
+
+        $daftarBantuan = $query->orderByDesc('tanggal_bantuan')->get();
+        $totalNominal = $daftarBantuan->sum('nominal');
+        $totalPenerima = $daftarBantuan->count();
+
+        $rekapSumber = $daftarBantuan->groupBy(fn ($b) => $b->sumber_program ?: 'Tidak Diketahui')
+            ->map(fn ($items) => [
+                'jumlah' => $items->count(),
+                'nominal' => $items->sum('nominal'),
+            ]);
+
+        $rekapJenis = $daftarBantuan->groupBy(fn ($b) => $b->jenis_bantuan ?: 'Lainnya')
+            ->map(fn ($items) => [
+                'jumlah' => $items->count(),
+                'nominal' => $items->sum('nominal'),
+            ]);
+
+        $wilayahList = Wilayah::whereIn('tingkat', [
+            Wilayah::TINGKAT_KECAMATAN,
+            Wilayah::TINGKAT_KELURAHAN,
+        ])->orderBy('tingkat')->orderBy('nama')->get();
+
+        return view('bantuan.rekap', compact(
+            'daftarBantuan',
+            'totalNominal',
+            'totalPenerima',
+            'rekapSumber',
+            'rekapJenis',
+            'wilayahList',
+            'tahun',
+            'triwulan',
+            'sumberProgram',
+            'wilayahId'
+        ));
+    }
 }

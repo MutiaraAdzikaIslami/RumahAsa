@@ -171,4 +171,34 @@ class RumahManagementTest extends TestCase
         ]);
         $responsePost->assertStatus(403);
     }
+
+    public function test_admin_bisa_buat_rumah_dengan_kelurahan_dan_rt_rw_otomatis(): void
+    {
+        $kel = Wilayah::create([
+            'kode'      => '35.15.12.2001',
+            'nama'      => 'Becirongengor',
+            'tingkat'   => 'kelurahan',
+            'parent_id' => $this->rt->parent_id,
+            'path'      => '/' . $this->rt->parent_id,
+        ]);
+        $kel->update(['path' => $kel->path . '/' . $kel->id]);
+
+        $response = $this->actingAs($this->admin)->post('/rumah', [
+            'nama_kepala_keluarga' => 'Siti Kemendagri',
+            'nik'                  => '3515120000000001',
+            'no_kk'                => '3515120000000002',
+            'jumlah_anggota'       => 3,
+            'alamat'               => 'Jl. Desa No. 5',
+            'kelurahan_id'         => $kel->id,
+            'rw_text'              => '005',
+            'rt_text'              => '003',
+            'surveyor_id'          => $this->surveyor->id,
+            'action'               => 'save',
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('rumah_warga', ['nama_kepala_keluarga' => 'Siti Kemendagri']);
+        $this->assertDatabaseHas('wilayah', ['nama' => 'RW 005', 'tingkat' => 'rw', 'parent_id' => $kel->id]);
+        $this->assertDatabaseHas('wilayah', ['nama' => 'RT 003', 'tingkat' => 'rt']);
+    }
 }

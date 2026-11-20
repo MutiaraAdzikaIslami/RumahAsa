@@ -51,19 +51,65 @@
                     <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
                     Dashboard
                 </a>
-                <a href="{{ route('rumah.index') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('rumah.*') ? 'bg-forest-light' : '' }}">
-                    <i data-lucide="list" class="w-4 h-4"></i>
-                    Daftar Rumah
+
+                {{-- Khusus Verifikator: Review Pengajuan Survei --}}
+                @can('access-verifikator')
+                <a href="{{ route('verifikator.survei.index') }}" class="flex items-center justify-between px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('verifikator.*') ? 'bg-forest-light' : '' }}">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+                        <span>Review Survei</span>
+                    </div>
+                    @php
+                        $antreanDiajukanCount = \App\Models\RumahWarga::where('status', \App\Models\RumahWarga::STATUS_DIAJUKAN)->count();
+                    @endphp
+                    @if ($antreanDiajukanCount > 0)
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500 text-slate-900">{{ $antreanDiajukanCount }}</span>
+                    @endif
                 </a>
+                @endcan
+
+                {{-- Data Rumah: Semua Peran --}}
+                <a href="{{ route('rumah.index') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('rumah.index') || request()->routeIs('rumah.show') || request()->routeIs('rumah.edit') ? 'bg-forest-light' : '' }}">
+                    <i data-lucide="home" class="w-4 h-4"></i>
+                    Data Rumah
+                </a>
+
+                {{-- Khusus Admin: Input Rumah Baru --}}
                 @can('input-rumah')
                 <a href="{{ route('rumah.create') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('rumah.create') ? 'bg-forest-light' : '' }}">
                     <i data-lucide="plus-circle" class="w-4 h-4"></i>
                     Input Rumah
                 </a>
                 @endcan
+
+                {{-- Khusus Surveyor: Progres Renovasi di Wilayah Tugas --}}
+                @can('access-surveyor')
+                <a href="{{ route('rumah.index', ['status' => 'Dalam Renovasi']) }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->query('status') === 'Dalam Renovasi' ? 'bg-forest-light' : '' }}">
+                    <i data-lucide="hammer" class="w-4 h-4"></i>
+                    Progres Renovasi
+                </a>
+                @endcan
+
+                {{-- Khusus Verifikator, Admin, Pimpinan: Bantuan & Renovasi --}}
+                @canany(['verifikator', 'admin', 'pimpinan'])
+                <a href="{{ route('bantuan.index') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('bantuan.index') && request()->query('status') !== 'Dalam Renovasi' ? 'bg-forest-light' : '' }}">
+                    <i data-lucide="hand-heart" class="w-4 h-4"></i>
+                    Daftar Penerima Bantuan
+                </a>
+                <a href="{{ route('bantuan.index', ['status' => 'Dalam Renovasi']) }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->query('status') === 'Dalam Renovasi' ? 'bg-forest-light' : '' }}">
+                    <i data-lucide="hammer" class="w-4 h-4"></i>
+                    Progres Renovasi
+                </a>
+                <a href="{{ route('bantuan.rekap') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('bantuan.rekap') ? 'bg-forest-light' : '' }}">
+                    <i data-lucide="pie-chart" class="w-4 h-4"></i>
+                    Rekap Dana
+                </a>
+                @endcanany
+
+                {{-- Menu Khusus Admin --}}
                 @can('manage-wilayah')
                 <a href="{{ route('wilayah.view') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('wilayah.*') ? 'bg-forest-light' : '' }}">
-                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                    <i data-lucide="map" class="w-4 h-4"></i>
                     Kelola Wilayah
                 </a>
                 @endcan
@@ -79,13 +125,27 @@
                     Audit Log
                 </a>
                 @endcan
-                @canany(['verifikator', 'admin', 'pimpinan'])
-                <a href="{{ route('bantuan.index') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('bantuan.*') ? 'bg-forest-light' : '' }}">
-                    <i data-lucide="hammer" class="w-4 h-4"></i>
-                    Bantuan &amp; Renovasi
+
+                {{-- Profil / Ganti Password --}}
+                <div class="pt-2 border-t border-forest-light/60 my-2"></div>
+                <a href="{{ route('password.change') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('password.*') ? 'bg-forest-light' : '' }}">
+                    <i data-lucide="user-cog" class="w-4 h-4"></i>
+                    Profil &amp; Keamanan
                 </a>
-                @endcanany
             </nav>
+
+            {{-- Kartu Butuh Bantuan Sesuai Mockup --}}
+            <div class="mx-4 mb-3 rounded-xl bg-forest-light/70 p-3.5 border border-forest-light">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-terracotta/20 flex items-center justify-center flex-shrink-0 text-terracotta">
+                        <i data-lucide="life-buoy" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-white">Butuh Bantuan?</p>
+                        <p class="text-[11px] text-green-200 mt-0.5 leading-snug">Hubungi helpdesk teknis RumahAsa atau admin kelurahan.</p>
+                    </div>
+                </div>
+            </div>
             <div class="p-4 border-t border-forest-light">
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf

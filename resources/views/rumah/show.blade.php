@@ -6,9 +6,19 @@
 <div class="space-y-4 max-w-4xl">
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-slate-900">Detail Rumah</h1>
-        <div class="space-x-2">
-            @if ($rumah->bisaDiedit())
-                <a href="{{ route('rumah.edit', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Edit Rumah</a>
+        <div class="flex items-center gap-2">
+            @can('input-rumah')
+                @if ($rumah->bisaDiedit())
+                    <a href="{{ route('rumah.edit', $rumah) }}" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">Edit Rumah</a>
+                @endif
+            @endcan
+            @can('access-verifikator')
+                @if ($rumah->status === \App\Models\RumahWarga::STATUS_DIAJUKAN)
+                    <a href="{{ route('verifikator.survei.show', $rumah) }}" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 text-sm font-bold rounded-lg">Review Survei</a>
+                @endif
+            @endcan
+            @if (in_array($rumah->status, [\App\Models\RumahWarga::STATUS_DALAM_RENOVASI, \App\Models\RumahWarga::STATUS_SELESAI], true))
+                <a href="{{ route('bantuan.progres.index', $rumah) }}" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg">Progres Renovasi</a>
             @endif
             <a href="{{ route('rumah.index') }}" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded-lg">Kembali</a>
         </div>
