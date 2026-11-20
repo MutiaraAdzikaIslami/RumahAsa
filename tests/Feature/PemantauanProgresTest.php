@@ -77,4 +77,17 @@ class PemantauanProgresTest extends TestCase
 
         $this->assertSame('Dalam Renovasi', $rumah->fresh()->status);
     }
+
+    public function test_verifikator_tidak_melihat_tombol_edit_progres_di_review_penyelesaian(): void
+    {
+        $rumah   = $this->buatRumah('Dalam Renovasi');
+        $bantuan = $this->buatBantuan($rumah);
+        $this->buatProgres($bantuan, 100, '2026-10-30');
+
+        $this->actingAs($this->buatUser('verifikator'))
+            ->get("/bantuan/{$rumah->id}")
+            ->assertOk()
+            ->assertSee('Tetapkan Selesai')
+            ->assertDontSee('Kelola Progres');
+    }
 }

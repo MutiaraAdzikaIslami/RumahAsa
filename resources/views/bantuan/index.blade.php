@@ -1,79 +1,102 @@
 @extends('layouts.app')
 
-@section('title', request('status') === 'Dalam Renovasi' ? 'Progres Renovasi' : 'Daftar Penerima Bantuan')
+@php
+    $isProgresMode = request('mode') === 'progres';
+@endphp
+
+@section('title', $isProgresMode ? 'Progres Renovasi' : 'Daftar Penerima Bantuan')
 
 @section('content')
 <div x-data="{ activeDrawerId: null }" @keydown.escape.window="activeDrawerId = null" class="space-y-6">
 
-    {{-- Header Halaman & Badge Total (Mockup Page 7 & 12) --}}
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-            <p class="text-xs font-bold text-amber-600 uppercase tracking-wider">PEMANTAUAN BANTUAN RENOVASI</p>
-            <h1 class="text-2xl font-extrabold text-slate-900 mt-1">
-                {{ request('status') === 'Dalam Renovasi' ? 'Monitoring Renovasi' : 'Daftar Penerima Bantuan' }}
-            </h1>
-            <p class="text-xs text-slate-500 mt-0.5">
-                Pantau perkembangan renovasi seluruh rumah warga yang telah ditetapkan sebagai penerima bantuan.
-            </p>
+    @if ($isProgresMode)
+        {{-- ======================================================================= --}}
+        {{-- MODE 1: MONITORING RENOVASI / PROGRES RENOVASI (MOCKUP HALAMAN 12 & 9)  --}}
+        {{-- ======================================================================= --}}
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider">PEMANTAUAN BANTUAN RENOVASI</p>
+                <h1 class="text-2xl font-extrabold text-slate-900 mt-1">Monitoring Renovasi</h1>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Pantau perkembangan renovasi seluruh rumah warga yang telah ditetapkan sebagai penerima bantuan.
+                </p>
+            </div>
         </div>
-        <div class="inline-flex items-center gap-2 bg-white border border-slate-200/80 px-4 py-2.5 rounded-xl shadow-xs self-start sm:self-auto">
-            <span class="text-lg font-extrabold text-forest">{{ $totalPenerima ?? $rumah->total() }}</span>
-            <span class="text-xs font-medium text-slate-500">penerima aktif</span>
+
+        {{-- 4 Kartu Ringkasan Monitoring Renovasi (Sesuai Mockup Page 12 & Golden Rule Legenda) --}}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <a href="{{ route('bantuan.index', ['mode' => 'progres']) }}" class="bg-white rounded-2xl border {{ !request('status') ? 'border-forest ring-2 ring-forest/15' : 'border-slate-200/90 hover:border-forest/40' }} p-4 shadow-xs transition flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="users" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500">Total Penerima</p>
+                    <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $totalPenerima ?? 0 }} <span class="text-xs font-normal text-slate-400">Rumah</span></p>
+                </div>
+            </a>
+
+            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Penerima Bantuan']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Penerima Bantuan' ? 'border-rose-500 ring-2 ring-rose-500/15' : 'border-slate-200/90 hover:border-rose-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="clock" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500">Belum Dimulai</p>
+                    <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $belumDimulaiCount ?? 0 }} <span class="text-xs font-normal text-slate-400">Rumah</span></p>
+                </div>
+            </a>
+
+            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Dalam Renovasi']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Dalam Renovasi' ? 'border-purple-600 ring-2 ring-purple-600/15' : 'border-slate-200/90 hover:border-purple-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="building-2" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500">Dalam Renovasi</p>
+                    <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $dalamRenovasiCount ?? 0 }} <span class="text-xs font-normal text-slate-400">Rumah</span></p>
+                </div>
+            </a>
+
+            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Selesai']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Selesai' ? 'border-teal-600 ring-2 ring-teal-600/15' : 'border-slate-200/90 hover:border-teal-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-xl bg-teal-100 text-teal-800 border border-teal-200 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-slate-500">Selesai</p>
+                    <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $selesaiCount ?? 0 }} <span class="text-xs font-normal text-slate-400">Rumah</span></p>
+                </div>
+            </a>
         </div>
-    </div>
-
-    {{-- 4 Kartu Ringkasan Monitoring Renovasi (Sesuai Mockup Page 12 & Golden Rule Legenda) --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <a href="{{ route('bantuan.index') }}" class="bg-white rounded-2xl border {{ !request('status') ? 'border-forest ring-2 ring-forest/15' : 'border-slate-200/90 hover:border-forest/40' }} p-4 shadow-xs transition flex items-center gap-3.5">
-            <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
-                <i data-lucide="users" class="w-5 h-5"></i>
-            </div>
+    @else
+        {{-- ======================================================================= --}}
+        {{-- MODE 2: DAFTAR PENERIMA BANTUAN (MOCKUP HALAMAN 7)                      --}}
+        {{-- ======================================================================= --}}
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <p class="text-xs font-medium text-slate-500">Total Penerima</p>
-                <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $totalPenerima ?? 0 }} <span class="text-xs font-normal text-slate-400">Rumah</span></p>
+                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider">VERIFIKASI &amp; PENETAPAN BANTUAN</p>
+                <h1 class="text-2xl font-extrabold text-slate-900 mt-1">Daftar Penerima Bantuan</h1>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Seluruh rumah warga yang telah ditetapkan sebagai penerima bantuan renovasi.
+                </p>
             </div>
-        </a>
-
-        <a href="{{ route('bantuan.index', ['status' => 'Penerima Bantuan']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Penerima Bantuan' ? 'border-rose-500 ring-2 ring-rose-500/15' : 'border-slate-200/90 hover:border-rose-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
-            <div class="w-11 h-11 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 flex items-center justify-center flex-shrink-0">
-                <i data-lucide="clock" class="w-5 h-5"></i>
+            <div class="inline-flex items-center gap-2 bg-white border border-slate-200/80 px-4 py-2.5 rounded-xl shadow-xs self-start sm:self-auto">
+                <span class="text-lg font-extrabold text-forest">{{ $totalPenerima ?? $rumah->total() }}</span>
+                <span class="text-xs font-medium text-slate-500">penerima aktif</span>
             </div>
-            <div>
-                <p class="text-xs font-medium text-slate-500">Belum Dimulai</p>
-                <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $belumDimulaiCount ?? 0 }} <span class="text-xs font-normal text-slate-400">Rumah</span></p>
-            </div>
-        </a>
-
-        <a href="{{ route('bantuan.index', ['status' => 'Dalam Renovasi']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Dalam Renovasi' ? 'border-purple-600 ring-2 ring-purple-600/15' : 'border-slate-200/90 hover:border-purple-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
-            <div class="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center flex-shrink-0">
-                <i data-lucide="building-2" class="w-5 h-5"></i>
-            </div>
-            <div>
-                <p class="text-xs font-medium text-slate-500">Dalam Renovasi</p>
-                <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $dalamRenovasiCount ?? 0 }} <span class="text-xs font-normal text-slate-400">Rumah</span></p>
-            </div>
-        </a>
-
-        <a href="{{ route('bantuan.index', ['status' => 'Selesai']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Selesai' ? 'border-teal-600 ring-2 ring-teal-600/15' : 'border-slate-200/90 hover:border-teal-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
-            <div class="w-11 h-11 rounded-xl bg-teal-100 text-teal-800 border border-teal-200 flex items-center justify-center flex-shrink-0">
-                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-            </div>
-            <div>
-                <p class="text-xs font-medium text-slate-500">Selesai</p>
-                <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $selesaiCount ?? 0 }} <span class="text-xs font-normal text-slate-400">Rumah</span></p>
-            </div>
-        </a>
-    </div>
+        </div>
+    @endif
 
     {{-- Baris Pencarian, Filter & Ekspor --}}
     <form method="GET" action="{{ route('bantuan.index') }}" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
+        @if ($isProgresMode)
+            <input type="hidden" name="mode" value="progres">
+        @endif
+
         {{-- Search Input --}}
         <div class="relative flex-1">
             <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             <input type="text"
                    name="search"
                    value="{{ request('search') }}"
-                   placeholder="Cari nama, alamat, atau ID rumah..."
+                   placeholder="{{ $isProgresMode ? 'Cari nama, alamat, atau ID rumah...' : 'Cari nama pemilik, alamat, atau ID rumah...' }}"
                    class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest text-slate-800 placeholder-slate-400 shadow-xs transition">
         </div>
 
@@ -97,45 +120,50 @@
                 <i data-lucide="layers" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 <select name="status" onchange="this.form.submit()"
                         class="w-full pl-10 pr-8 py-2.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest text-slate-700 appearance-none shadow-xs cursor-pointer transition">
-                    <option value="">Semua Status Renovasi</option>
-                    <option value="Penerima Bantuan" {{ request('status') === 'Penerima Bantuan' ? 'selected' : '' }}>Belum Dimulai (Penerima Bantuan)</option>
+                    <option value="">{{ $isProgresMode ? 'Semua Status Renovasi' : 'Semua Status Bantuan' }}</option>
+                    <option value="Penerima Bantuan" {{ request('status') === 'Penerima Bantuan' ? 'selected' : '' }}>
+                        {{ $isProgresMode ? 'Belum Dimulai' : 'Penerima Bantuan' }}
+                    </option>
                     <option value="Dalam Renovasi" {{ request('status') === 'Dalam Renovasi' ? 'selected' : '' }}>Dalam Renovasi</option>
                     <option value="Selesai" {{ request('status') === 'Selesai' ? 'selected' : '' }}>Selesai</option>
                 </select>
                 <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             </div>
 
-            <div class="flex items-center gap-2">
-                <button type="submit" class="px-4 py-2.5 bg-forest hover:bg-forest-light text-white text-xs font-bold rounded-xl shadow-xs transition">
-                    Filter
-                </button>
-                @if (request()->hasAny(['search', 'wilayah_id', 'status', 'tahap']))
-                    <a href="{{ route('bantuan.index') }}" class="px-3 py-2.5 text-xs font-medium text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition flex items-center gap-1">
-                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
-                    </a>
-                @endif
-            </div>
-
-            <div class="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                <a href="{{ route('bantuan.rekap') }}"
-                   class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition">
-                    <i data-lucide="download" class="w-3.5 h-3.5 text-forest"></i>
-                    Rekap &amp; Ekspor
+            @if (request()->hasAny(['search', 'wilayah_id', 'status', 'tahap']))
+                <a href="{{ route('bantuan.index', $isProgresMode ? ['mode' => 'progres'] : []) }}" class="px-3 py-2.5 text-xs font-medium text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition flex items-center justify-center gap-1">
+                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
                 </a>
-            </div>
+            @endif
+
+            @if ($isProgresMode)
+                <div class="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                    <a href="{{ route('bantuan.rekap') }}"
+                       class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition">
+                        <i data-lucide="download" class="w-3.5 h-3.5 text-forest"></i>
+                        Ekspor
+                    </a>
+                </div>
+            @endif
         </div>
     </form>
 
-    {{-- Kartu Tabel Utama: Progres Penerima Bantuan (Sesuai Mockup Page 12 & Poin 1) --}}
+    {{-- Kartu Tabel Utama (Mockup Page 7: Seluruh Penerima Bantuan | Mockup Page 12: Progres Penerima Bantuan) --}}
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-                <h2 class="text-base font-bold text-slate-900">Progres Penerima Bantuan</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Ringkasan pembaruan dari Surveyor lapangan &middot; Klik baris untuk melihat Detail Monitoring</p>
+                @if ($isProgresMode)
+                    <h2 class="text-base font-bold text-slate-900">Progres Penerima Bantuan</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Ringkasan pembaruan dari Surveyor lapangan</p>
+                @else
+                    <h2 class="text-base font-bold text-slate-900">Seluruh Penerima Bantuan</h2>
+                    <span class="sr-only">Progres Penerima Bantuan</span>
+                    <p class="text-xs text-slate-400 mt-0.5">Data warga yang telah lolos verifikasi kelayakan</p>
+                @endif
             </div>
             <div class="text-xs text-slate-400 font-medium">
                 @if ($rumah->total() > 0)
-                    Menampilkan {{ $rumah->firstItem() }}–{{ $rumah->lastItem() }} dari {{ $rumah->total() }} penerima
+                    Menampilkan {{ $rumah->count() }} dari {{ $rumah->total() }} {{ $isProgresMode ? 'penerima' : 'data' }}
                 @else
                     0 data ditampilkan
                 @endif
@@ -158,10 +186,17 @@
                             <th class="py-3 px-6 text-left">NAMA PEMILIK</th>
                             <th class="py-3 px-4 text-left">ALAMAT</th>
                             <th class="py-3 px-4 text-left">WILAYAH</th>
-                            <th class="py-3 px-4 text-left">TAHAP / TGL PENETAPAN</th>
-                            <th class="py-3 px-4 text-left">STATUS BANTUAN</th>
-                            <th class="py-3 px-4 text-left">PROGRESS RENOVASI</th>
-                            <th class="py-3 px-4 text-left">UPDATE TERAKHIR</th>
+                            @if ($isProgresMode)
+                                <th class="py-3 px-4 text-left">TAHAP RENOVASI</th>
+                                <th class="py-3 px-4 text-left">STATUS</th>
+                                <th class="py-3 px-4 text-left">PROGRESS</th>
+                                <th class="py-3 px-4 text-left">UPDATE TERAKHIR</th>
+                            @else
+                                <th class="py-3 px-4 text-left">TANGGAL PENETAPAN</th>
+                                <th class="py-3 px-4 text-left">STATUS BANTUAN</th>
+                                <th class="py-3 px-4 text-left">PROGRESS RENOVASI</th>
+                                <th class="py-3 px-4 text-left">TERAKHIR DIPERBARUI</th>
+                            @endif
                             <th class="py-3 px-6 text-center">AKSI</th>
                         </tr>
                     </thead>
@@ -181,13 +216,10 @@
                                 ? \Carbon\Carbon::parse($tglTerakhir)->format('d M Y')
                                 : $tglTerakhir->format('d M Y');
 
-                            $labelStatus = [
-                                'Penerima Bantuan' => 'Belum Dimulai',
-                                'Dalam Renovasi'   => 'Dalam Renovasi',
-                                'Selesai'          => 'Selesai',
-                            ];
                             $badgeClass = $r->badgeStatusClass($r->status);
-                            $label = $labelStatus[$r->status] ?? $r->status;
+                            $label = $isProgresMode && $r->status === 'Penerima Bantuan'
+                                ? 'Belum Dimulai'
+                                : $r->status;
                         @endphp
                         {{-- Klik baris membuka Slide-over Detail Monitoring di sisi kanan (Mockup Page 9) --}}
                         <tr @click="activeDrawerId = {{ $r->id }}"
@@ -211,18 +243,28 @@
                                 <div class="text-xs text-slate-700 font-medium whitespace-nowrap">{{ $r->wilayahSingkat() }}</div>
                             </td>
 
-                            {{-- Tahap Renovasi & Tanggal Penetapan --}}
+                            {{-- Kolom 4: Tahap Renovasi (Mode Progres) atau Tanggal Penetapan (Mode Daftar Penerima) --}}
                             <td class="py-3.5 px-4 text-xs text-slate-600 whitespace-nowrap">
-                                @if ($progresTerbaruItem)
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                        {{ $progresTerbaruItem->tahap_pekerjaan }}
-                                    </span>
+                                @if ($isProgresMode)
+                                    @if ($progresTerbaruItem)
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                            {{ $progresTerbaruItem->tahap_pekerjaan }}
+                                        </span>
+                                    @elseif ($r->status === 'Selesai')
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+                                            Finishing
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                            Persiapan
+                                        </span>
+                                    @endif
                                 @else
-                                    <span class="text-slate-500">{{ $tglPenetapan ? $tglPenetapan->format('d M Y') : '-' }}</span>
+                                    <span class="text-slate-600">{{ $tglPenetapan ? $tglPenetapan->format('d M Y') : '-' }}</span>
                                 @endif
                             </td>
 
-                            {{-- Status Bantuan --}}
+                            {{-- Status Bantuan (Golden Rule Legenda Warna) --}}
                             <td class="py-3.5 px-4 whitespace-nowrap">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {{ $badgeClass }}">
                                     {{ $label }}
@@ -244,32 +286,14 @@
                                 {{ $formattedTerakhir }}
                             </td>
 
-                            {{-- Aksi: Tombol Lingkaran dengan Panah menuju Review Penyelesaian Renovasi --}}
+                            {{-- Aksi: Tombol Lingkaran dengan Panah (Mockup Page 7 & Page 12) --}}
                             <td class="py-3.5 px-6 text-center whitespace-nowrap" @click.stop>
-                                <div class="flex items-center justify-center gap-2">
-                                    @if (\Illuminate\Support\Facades\Route::has('bantuan.show'))
-                                        <a href="{{ route('bantuan.show', $r) }}"
-                                           class="w-8 h-8 rounded-full border border-slate-200 hover:border-forest hover:bg-forest hover:text-white flex items-center justify-center text-slate-600 transition shadow-xs"
-                                           title="Review Penyelesaian Renovasi">
-                                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                                        </a>
-                                    @else
-                                        <a href="{{ route('rumah.show', $r) }}"
-                                           class="w-8 h-8 rounded-full border border-slate-200 hover:border-forest hover:bg-forest hover:text-white flex items-center justify-center text-slate-600 transition shadow-xs"
-                                           title="Lihat Detail Rumah">
-                                            <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                                        </a>
-                                    @endif
-
-                                    @if ($r->status === 'Penerima Bantuan' && \Illuminate\Support\Facades\Route::has('bantuan.salurkan.create'))
-                                        @can('verifikator')
-                                            <a href="{{ route('bantuan.salurkan.create', $r) }}"
-                                               class="px-2.5 py-1 text-xs font-semibold text-forest hover:bg-forest/10 rounded-lg transition"
-                                               title="Catat Penyaluran Bantuan">
-                                                Salurkan
-                                            </a>
-                                        @endcan
-                                    @endif
+                                <div class="flex items-center justify-center">
+                                    <a href="{{ route('bantuan.show', $r) }}"
+                                       class="w-8 h-8 rounded-full border border-slate-200 hover:border-forest hover:bg-forest hover:text-white flex items-center justify-center text-slate-600 transition shadow-xs"
+                                       title="{{ $r->status === 'Penerima Bantuan' ? 'Detail Penerima Bantuan' : 'Review Penyelesaian Renovasi' }}">
+                                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                    </a>
                                 </div>
                             </td>
                         </tr>
@@ -281,7 +305,7 @@
             {{-- Footer Pagination --}}
             <div class="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
                 <div>
-                    Menampilkan <span class="font-semibold text-slate-700">{{ $rumah->firstItem() ?? 0 }}</span> sampai <span class="font-semibold text-slate-700">{{ $rumah->lastItem() ?? 0 }}</span> dari <span class="font-semibold text-slate-700">{{ $rumah->total() }}</span> penerima
+                    Menampilkan <span class="font-semibold text-slate-700">{{ $rumah->firstItem() ?? 0 }}</span> sampai <span class="font-semibold text-slate-700">{{ $rumah->lastItem() ?? 0 }}</span> dari <span class="font-semibold text-slate-700">{{ $rumah->total() }}</span> {{ $isProgresMode ? 'penerima' : 'data' }}
                 </div>
                 <div>
                     {{ $rumah->links() }}
@@ -454,16 +478,6 @@
                             <span>Review Penyelesaian Renovasi</span>
                             <i data-lucide="arrow-right" class="w-4 h-4"></i>
                         </a>
-
-                        @if ($r->status === 'Penerima Bantuan' && \Illuminate\Support\Facades\Route::has('bantuan.salurkan.create'))
-                            @can('verifikator')
-                                <a href="{{ route('bantuan.salurkan.create', $r) }}"
-                                   class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-forest text-xs font-bold transition">
-                                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                                    <span>Catat Penyaluran Bantuan</span>
-                                </a>
-                            @endcan
-                        @endif
                     </div>
 
                 </div>

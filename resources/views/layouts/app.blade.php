@@ -127,11 +127,11 @@
 
                 {{-- Khusus Verifikator, Admin, Pimpinan: Bantuan & Renovasi --}}
                 @canany(['verifikator', 'admin', 'pimpinan'])
-                <a href="{{ route('bantuan.index') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('bantuan.index') && request()->query('status') !== 'Dalam Renovasi' ? 'bg-forest-light font-semibold' : '' }}">
+                <a href="{{ route('bantuan.index') }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->routeIs('bantuan.index') && request()->query('mode') !== 'progres' ? 'bg-forest-light font-semibold' : '' }}">
                     <i data-lucide="hand-heart" class="w-4 h-4"></i>
                     Daftar Penerima Bantuan
                 </a>
-                <a href="{{ route('bantuan.index', ['status' => 'Dalam Renovasi']) }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ request()->query('status') === 'Dalam Renovasi' ? 'bg-forest-light font-semibold' : '' }}">
+                <a href="{{ route('bantuan.index', ['mode' => 'progres']) }}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm hover:bg-forest-light transition {{ (request()->routeIs('bantuan.index') && request()->query('mode') === 'progres') || request()->routeIs('bantuan.show') ? 'bg-forest-light font-semibold' : '' }}">
                     <i data-lucide="clipboard-list" class="w-4 h-4"></i>
                     Progres Renovasi
                 </a>

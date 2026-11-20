@@ -17,7 +17,7 @@
             <p class="text-sm text-slate-500 mt-0.5">Catat perkembangan pekerjaan dan dokumentasi lapangan secara berkala.</p>
         </div>
         <div class="flex items-center gap-2">
-            @canany(['surveyor', 'verifikator'])
+            @can('surveyor')
                 @if ($dalamRenovasi)
                     <a href="{{ route('bantuan.progres.create', $rumah) }}"
                        class="inline-flex items-center gap-2 px-4 py-2.5 bg-forest hover:bg-forest-light text-white text-xs font-semibold rounded-xl shadow-sm transition">
@@ -25,7 +25,7 @@
                         Tambah Progres
                     </a>
                 @endif
-            @endcanany
+            @endcan
             <a href="{{ route('bantuan.index') }}"
                class="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-sm transition">
                 Kembali
@@ -128,14 +128,14 @@
                         </div>
                         <h3 class="text-sm font-semibold text-slate-800">Belum ada progres yang dicatat</h3>
                         <p class="text-xs text-slate-500 mt-1">Surveyor lapangan dapat menambahkan progres renovasi dan foto dokumentasi.</p>
-                        @canany(['surveyor', 'verifikator'])
+                        @can('surveyor')
                             @if ($dalamRenovasi)
                                 <a href="{{ route('bantuan.progres.create', $rumah) }}"
                                    class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-forest hover:bg-forest-light text-white text-xs font-semibold rounded-xl shadow-sm transition">
                                     <i data-lucide="plus" class="w-3.5 h-3.5"></i> Tambah Progres Pertama
                                 </a>
                             @endif
-                        @endcanany
+                        @endcan
                     </div>
                 @else
                     {{-- Timeline Items --}}
@@ -160,8 +160,8 @@
                                             @endif
                                         </div>
 
-                                        {{-- Tombol Edit & Hapus (Mockup Page 9) --}}
-                                        @canany(['surveyor', 'verifikator'])
+                                        {{-- Tombol Edit & Hapus: Hanya Surveyor (Mockup Page 9) --}}
+                                        @can('surveyor')
                                             @if ($dalamRenovasi)
                                                 <div class="flex items-center gap-1">
                                                     <a href="{{ route('bantuan.progres.edit', [$rumah, $p]) }}"
@@ -181,7 +181,7 @@
                                                     </form>
                                                 </div>
                                             @endif
-                                        @endcanany
+                                        @endcan
                                     </div>
 
                                     {{-- Progress Bar --}}

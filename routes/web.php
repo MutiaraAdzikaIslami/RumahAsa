@@ -3,6 +3,8 @@
 use App\Modules\Auth\Http\Controllers\LoginController;
 use App\Modules\Auth\Http\Controllers\PasswordController;
 use App\Modules\Auth\Http\Controllers\SessionController;
+use App\Modules\Dashboard\Http\Controllers\DashboardController;
+use App\Modules\Heatmap\Http\Controllers\HeatmapController;
 use App\Modules\Wilayah\Http\Controllers\WilayahController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,9 +24,10 @@ Route::middleware('auth')->group(function () {
 
 // Dashboard + modul-modul (protected oleh must.change.pwd)
 Route::middleware(['auth', 'must.change.pwd'])->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard.placeholder', ['user' => auth()->user()]);
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // FR-31: Heatmap renovasi (Verifikator, Surveyor, Pimpinan) — SCRUM-159 s.d. SCRUM-163
+    Route::get('/heatmap/data', [HeatmapController::class, 'data'])->name('heatmap.data');
 
     // scrum-17: Kelola Wilayah (FR-08) — admin only
     Route::middleware('role:manage-wilayah')->prefix('wilayah')->name('wilayah.')->group(function () {

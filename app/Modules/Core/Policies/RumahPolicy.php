@@ -40,17 +40,32 @@ class RumahPolicy
     }
 
     /**
-     * AC-05, AC-06, AC-07, AC-10: Hak akses mengubah data rumah.
-     * - Hanya Surveyor yang berwenang di wilayah tugas rumah tersebut.
-     * - Status rumah harus bisa diedit (Draf atau Perlu Perbaikan).
-     * - Pimpinan: Ditolak (read-only).
+     * Hak akses mengubah data rumah:
+     * - Hanya Admin yang berwenang.
+     * - Status rumah harus bisa diedit (Menunggu Disurvei atau Draf).
+     * - Surveyor, Verifikator, Pimpinan: Ditolak.
      */
     public function update(User $user, RumahWarga $rumah): bool
     {
-        if ($user->isPimpinan()) {
+        if (!$user->isAdmin()) {
             return false;
         }
 
+        if (!$rumah->bisaDiedit()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Hak akses mengisi survei kelayakan:
+     * - Hanya Surveyor yang berwenang di wilayah tugas rumah tersebut.
+     * - Status rumah harus bisa disurvei (Menunggu Disurvei, Draf, atau Perlu Perbaikan).
+     * - Admin, Verifikator, Pimpinan: Ditolak.
+     */
+    public function survei(User $user, RumahWarga $rumah): bool
+    {
         if (!$user->isSurveyor()) {
             return false;
         }
@@ -59,7 +74,7 @@ class RumahPolicy
             return false;
         }
 
-        if (!$rumah->bisaDiedit()) {
+        if (!$rumah->bisaDisurvei()) {
             return false;
         }
 
@@ -109,10 +124,18 @@ class RumahPolicy
 
     /**
      * Memeriksa apakah data rumah berada dalam lingkup wilayah tugas Surveyor.
-     * Mendukung hierarki wilayah (misal: tugas di Kelurahan mencakup seluruh RW dan RT di bawahnya).
+     * Mendukung hierarki wilayah tingkat Kecamatan:
+     * - Surveyor yang ditugaskan pada rumah terkait langsung memiliki hak akses.
+     * - Surveyor di tingkat Kecamatan mencakup seluruh Kelurahan, RW, dan RT di bawahnya.
+     * - Surveyor dalam lingkup Kecamatan yang sama dengan rumah dapat mengakses data rumah tersebut.
      */
     public function rumahDalamWilayahSurveyor(User $surveyor, RumahWarga $rumah): bool
     {
+        // Jika surveyor ini yang secara eksplisit ditugaskan pada rumah tersebut
+        if ($rumah->surveyor_id && (int) $rumah->surveyor_id === (int) $surveyor->id) {
+            return true;
+        }
+
         $wilayahSurveyor = $surveyor->wilayah;
 
         // AC-07: Surveyor tanpa wilayah tugas tidak mendapat akses
@@ -125,17 +148,52 @@ class RumahPolicy
             return true;
         }
 
-        // Jika path wilayah tugas kosong, hanya cocokkan exact ID
-        if (empty($wilayahSurveyor->path)) {
-            return false;
-        }
-
-        // Cek hierarki wilayah: path wilayah rumah harus diawali dengan path wilayah tugas surveyor
+        // Cek hierarki wilayah: path wilayah rumah diawali dengan path wilayah tugas surveyor
         $wilayahRumah = $rumah->wilayah;
-        if (!$wilayahRumah || empty($wilayahRumah->path)) {
-            return false;
+        if ($wilayahRumah && !empty($wilayahRumah->path) && !empty($wilayahSurveyor->path)) {
+            if (str_starts_with($wilayahRumah->path, rtrim($wilayahSurveyor->path, '/') . '/')) {
+                return true;
+            }
         }
 
-        return str_starts_with($wilayahRumah->path, rtrim($wilayahSurveyor->path, '/') . '/');
+        // Cek apakah surveyor dan rumah berada dalam satu lingkup Kecamatan yang sama
+        if ($wilayahRumah) {
+            $kecamatanSurveyorId = $this->resolveKecamatanId($wilayahSurveyor);
+            $kecamatanRumahId    = $this->resolveKecamatanId($wilayahRumah);
+
+            if ($kecamatanSurveyorId !== null && $kecamatanSurveyorId === $kecamatanRumahId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Mengambil ID Kecamatan dari suatu hierarki wilayah.
+     */
+    private function resolveKecamatanId(\App\Models\Wilayah $wilayah): ?int
+    {
+        if ($wilayah->tingkat === \App\Models\Wilayah::TINGKAT_KECAMATAN) {
+            return $wilayah->id;
+        }
+
+        if (!empty($wilayah->path)) {
+            $segments = array_values(array_filter(explode('/', $wilayah->path)));
+            // Format path: /provinsi/kabupaten/kecamatan/... (indeks ke-2 adalah kecamatan)
+            if (count($segments) >= 3) {
+                return (int) $segments[2];
+            }
+        }
+
+        $current = $wilayah;
+        while ($current) {
+            if ($current->tingkat === \App\Models\Wilayah::TINGKAT_KECAMATAN) {
+                return $current->id;
+            }
+            $current = $current->parent;
+        }
+
+        return null;
     }
 }

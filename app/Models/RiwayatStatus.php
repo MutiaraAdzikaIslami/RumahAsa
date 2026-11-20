@@ -16,7 +16,7 @@ class RiwayatStatus extends Model
     protected $fillable = [
         'rumah_id', 'user_id',
         'status_dari', 'status_ke',
-        'catatan',
+        'catatan', 'created_at',
     ];
 
     // FIX: Karena $timestamps = false, kita harus cast manual ke datetime
