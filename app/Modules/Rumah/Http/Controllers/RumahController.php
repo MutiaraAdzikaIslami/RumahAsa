@@ -98,6 +98,114 @@ class RumahController extends Controller
         return view('rumah.index', compact('rumah', 'wilayahList', 'statusAlurCounts'));
     }
 
+    /**
+     * FR-27: Ekspor Data Rumah ke Excel (.xlsx) atau PDF (.pdf).
+     * Surveyor hanya mengekspor data di wilayah tugasnya, Verifikator & Admin seluruh data.
+     */
+    public function ekspor(Request $request, \App\Modules\Bantuan\Services\LaporanService $laporanService)
+    {
+        $user = auth()->user();
+        $format = strtolower((string) $request->query('format', 'excel'));
+
+        $query = RumahWarga::with(['wilayah.parent.parent.parent', 'surveyor', 'survei.komponenSurvei', 'penerimaBantuan.progres']);
+
+        if ($user->isSurveyor()) {
+            if ($user->wilayah) {
+                $wilayahPath = $user->wilayah->path;
+                $query->whereHas('wilayah', function ($q) use ($wilayahPath) {
+                    $q->where('path', $wilayahPath)
+                      ->orWhere('path', 'like', $wilayahPath . '/%');
+                });
+            } else {
+                $query->where('surveyor_id', $user->id);
+            }
+        }
+
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('kode_registrasi', 'like', "%{$search}%")
+                  ->orWhere('nama_kepala_keluarga', 'like', "%{$search}%")
+                  ->orWhere('alamat', 'like', "%{$search}%")
+                  ->orWhereHas('wilayah', function ($q2) use ($search) {
+                      $q2->where('nama', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($status = $request->query('status')) {
+            if ($status === RumahWarga::STATUS_MENUNGGU_SURVEI) {
+                $query->where('status', RumahWarga::STATUS_DRAF)
+                    ->where(function ($q) {
+                        $q->whereDoesntHave('survei')
+                          ->orWhereDoesntHave('survei.komponenSurvei', function ($qk) {
+                              $qk->whereNotNull('opsi_kondisi_id')->orWhereNotNull('catatan');
+                          });
+                    });
+            } else {
+                $query->where('status', $status);
+            }
+        }
+
+        if ($wilayahId = $request->query('wilayah_id')) {
+            $wilayah = Wilayah::find($wilayahId);
+            if ($wilayah) {
+                $query->whereHas('wilayah', function ($q) use ($wilayah) {
+                    $q->where('id', $wilayah->id)
+                      ->orWhere('path', 'like', $wilayah->path . '/%');
+                });
+            }
+        }
+
+        $daftarRumah = $query->latest('updated_at')->get();
+        $metaFilter = $request->only(['search', 'wilayah_id', 'status']);
+        $timestamp = now()->format('Ymd-His');
+
+        if ($format === 'pdf') {
+            return $laporanService->eksporPdf(
+                jenis:      'rumah_warga',
+                view:       'rumah.pdf.daftar-rumah',
+                viewData:   ['daftarRumah' => $daftarRumah],
+                filename:   "data-rumah-warga-{$timestamp}.pdf",
+                metaFilter: $metaFilter,
+            );
+        }
+
+        $headings = [
+            'No',
+            'Kode Registrasi',
+            'Nama Kepala Keluarga',
+            'NIK (Tersamar)',
+            'Alamat Lengkap',
+            'Wilayah',
+            'Status Alur',
+            'Surveyor',
+            'Terakhir Diperbarui',
+        ];
+
+        $rows = [];
+        foreach ($daftarRumah as $idx => $r) {
+            $rows[] = [
+                $idx + 1,
+                $r->kode_registrasi,
+                $r->nama_kepala_keluarga ?? '-',
+                $r->nik_enc ? $r->nikTersamar() : '-',
+                $r->alamatLengkap(),
+                $r->wilayahSingkat(),
+                $r->statusAlur(),
+                $r->surveyor?->nama ?? '-',
+                $r->terakhirDiperbaruiLabel(),
+            ];
+        }
+
+        return $laporanService->eksporExcel(
+            jenis:      'rumah_warga',
+            headings:   $headings,
+            rows:       $rows,
+            filename:   "data-rumah-warga-{$timestamp}.xlsx",
+            metaFilter: $metaFilter,
+        );
+    }
+
     public function create()
     {
         // Cascading dropdown: load kabupaten (514 baris, cepat & ringan)

@@ -22,14 +22,32 @@ class PemantauanController extends Controller
         abort_unless(in_array($rumah->status, BantuanController::STATUS_BANTUAN, true), 404);
 
         $rumah->load([
-            'wilayah',
+            'wilayah.parent.parent.parent',
             'surveyor',
             'penerimaBantuan.progres.fotos',
-            'survei.komponen.foto',
-            'riwayatStatus',
+            'survei.komponenSurvei.foto',
+            'riwayatStatus.user',
         ]);
 
         return view('bantuan.show', ['rumah' => $rumah, 'bantuan' => $rumah->penerimaBantuan]);
+    }
+
+    /**
+     * Halaman Detail Penerima Bantuan (diakses dari Daftar Penerima Bantuan — Mockup Halaman 11 & 10).
+     */
+    public function showPenerima(RumahWarga $rumah)
+    {
+        abort_unless(in_array($rumah->status, BantuanController::STATUS_BANTUAN, true), 404);
+
+        $rumah->load([
+            'wilayah.parent.parent.parent',
+            'surveyor',
+            'penerimaBantuan.progres.fotos',
+            'survei.komponenSurvei.foto',
+            'riwayatStatus.user',
+        ]);
+
+        return view('bantuan.penerima', ['rumah' => $rumah, 'bantuan' => $rumah->penerimaBantuan]);
     }
 
     public function selesai(Request $request, RumahWarga $rumah)

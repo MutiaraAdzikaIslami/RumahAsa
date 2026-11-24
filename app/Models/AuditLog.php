@@ -56,13 +56,15 @@ class AuditLog extends Model
         'FOTO_UPLOAD'                => 'FOTO_UPLOAD',
         'FOTO_DELETE'                => 'FOTO_DELETE',
         'FOTO_VIEW'                  => 'FOTO_VIEW',
-        // Workflow
+        // Workflow & Bantuan
         'STATUS_CHANGE'              => 'STATUS_CHANGE',
-        'BANTUAN_CREATE' => 'BANTUAN_CREATE',
-        'PROGRES_CREATE' => 'PROGRES_CREATE',
-        'PROGRES_UPDATE' => 'PROGRES_UPDATE',
-        'PROGRES_DELETE' => 'PROGRES_DELETE',
-        // (akan ditambah saat modul lain dibuat: VERIFIKASI_*, BANTUAN_*, PROGRES_*, EKSPOR_*)
+        'BANTUAN_CREATE'             => 'BANTUAN_CREATE',
+        'PROGRES_CREATE'             => 'PROGRES_CREATE',
+        'PROGRES_UPDATE'             => 'PROGRES_UPDATE',
+        'PROGRES_DELETE'             => 'PROGRES_DELETE',
+        // Pelaporan & Ekspor (FR-27, FR-30, NFR-05)
+        'EKSPOR_EXCEL'               => 'EKSPOR_EXCEL',
+        'EKSPOR_PDF'                 => 'EKSPOR_PDF',
     ];
 
     public function user(): BelongsTo

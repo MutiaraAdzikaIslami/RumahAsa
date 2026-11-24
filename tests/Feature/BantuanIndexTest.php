@@ -141,4 +141,49 @@ class BantuanIndexTest extends TestCase
             ->assertSee('Warga Rekap Dana')
             ->assertSee('APBD');
     }
+
+    public function test_ekspor_rekap_dana_excel_dan_pdf_mencatat_audit_log(): void
+    {
+        $rumah = $this->buatRumah('Dalam Renovasi', 'Warga Ekspor Dana');
+        $this->buatBantuan($rumah, '2026-10-01');
+        $verifikator = $this->buatUser('verifikator');
+
+        $resExcel = $this->actingAs($verifikator)
+            ->get('/bantuan/rekap-dana/ekspor?format=excel&tahun=2026');
+        $resExcel->assertOk();
+        $this->assertDatabaseHas('audit_log', [
+            'aksi'    => 'EKSPOR_EXCEL',
+            'entitas' => 'rekap_dana',
+        ]);
+
+        $resPdf = $this->actingAs($verifikator)
+            ->get('/bantuan/rekap-dana/ekspor?format=pdf&tahun=2026');
+        $resPdf->assertOk();
+        $this->assertDatabaseHas('audit_log', [
+            'aksi'    => 'EKSPOR_PDF',
+            'entitas' => 'rekap_dana',
+        ]);
+    }
+
+    public function test_ekspor_daftar_penerima_bantuan_excel_dan_pdf(): void
+    {
+        $rumah = $this->buatRumah('Penerima Bantuan', 'Warga Ekspor Daftar');
+        $verifikator = $this->buatUser('verifikator');
+
+        $this->actingAs($verifikator)
+            ->get('/bantuan/ekspor?format=excel')
+            ->assertOk();
+        $this->assertDatabaseHas('audit_log', [
+            'aksi'    => 'EKSPOR_EXCEL',
+            'entitas' => 'penerima_bantuan',
+        ]);
+
+        $this->actingAs($verifikator)
+            ->get('/bantuan/ekspor?format=pdf&mode=progres')
+            ->assertOk();
+        $this->assertDatabaseHas('audit_log', [
+            'aksi'    => 'EKSPOR_PDF',
+            'entitas' => 'progres_renovasi',
+        ]);
+    }
 }

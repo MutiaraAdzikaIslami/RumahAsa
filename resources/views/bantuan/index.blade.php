@@ -2,12 +2,33 @@
 
 @php
     $isProgresMode = request('mode') === 'progres';
+    $queryExportBase = array_filter([
+        'mode'       => request('mode'),
+        'status'     => request('status'),
+        'wilayah_id' => request('wilayah_id'),
+        'tahap'      => request('tahap'),
+        'search'     => request('search'),
+    ]);
 @endphp
 
 @section('title', $isProgresMode ? 'Progres Renovasi' : 'Daftar Penerima Bantuan')
 
 @section('content')
-<div x-data="{ activeDrawerId: null }" @keydown.escape.window="activeDrawerId = null" class="space-y-6">
+<div x-data="{
+        activeDrawerId: null,
+        openExportModal: false,
+        exportFormat: 'excel',
+        lightboxOpen: false,
+        lightboxImage: '',
+        lightboxTitle: '',
+        openPhoto(url, title) {
+            this.lightboxImage = url;
+            this.lightboxTitle = title;
+            this.lightboxOpen = true;
+        }
+     }"
+     @keydown.escape.window="activeDrawerId = null; openExportModal = false; lightboxOpen = false"
+     class="space-y-6 ra-page-enter">
 
     @if ($isProgresMode)
         {{-- ======================================================================= --}}
@@ -15,17 +36,32 @@
         {{-- ======================================================================= --}}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider">PEMANTAUAN BANTUAN RENOVASI</p>
+                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider">PEMANTAUAN BANTUAN</p>
                 <h1 class="text-2xl font-extrabold text-slate-900 mt-1">Monitoring Renovasi</h1>
                 <p class="text-xs text-slate-500 mt-0.5">
-                    Pantau perkembangan renovasi seluruh rumah warga yang telah ditetapkan sebagai penerima bantuan.
+                    Pantau perkembangan renovasi seluruh penerima bantuan.
                 </p>
+            </div>
+            <div class="flex items-center gap-2.5 self-start sm:self-auto">
+                <div class="inline-flex items-center gap-2 bg-white border border-slate-200/80 px-3.5 py-2 rounded-xl shadow-2xs text-xs text-slate-500">
+                    <i data-lucide="clock" class="w-3.5 h-3.5 text-forest"></i>
+                    <span>Data diperbarui {{ $rumah->first()?->terakhirDiperbaruiLabel() ?? 'hari ini' }}</span>
+                </div>
+                @canany(['verifikator', 'admin'])
+                    <button type="button"
+                            @click="openExportModal = true"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-xs transition ra-btn-press">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>Ekspor</span>
+                    </button>
+                @endcanany
             </div>
         </div>
 
         {{-- 4 Kartu Ringkasan Monitoring Renovasi (Sesuai Mockup Page 12 & Golden Rule Legenda) --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <a href="{{ route('bantuan.index', ['mode' => 'progres']) }}" class="bg-white rounded-2xl border {{ !request('status') ? 'border-forest ring-2 ring-forest/15' : 'border-slate-200/90 hover:border-forest/40' }} p-4 shadow-xs transition flex items-center gap-3.5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ra-stagger">
+            <a href="{{ route('bantuan.index', ['mode' => 'progres']) }}"
+               class="bg-white rounded-2xl border {{ !request('status') ? 'border-forest ring-2 ring-forest/15' : 'border-slate-200/90 hover:border-forest/40' }} p-4 shadow-xs transition flex items-center gap-3.5 ra-card-hover">
                 <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
                     <i data-lucide="users" class="w-5 h-5"></i>
                 </div>
@@ -35,7 +71,8 @@
                 </div>
             </a>
 
-            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Penerima Bantuan']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Penerima Bantuan' ? 'border-rose-500 ring-2 ring-rose-500/15' : 'border-slate-200/90 hover:border-rose-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
+            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Penerima Bantuan']) }}"
+               class="bg-white rounded-2xl border {{ request('status') === 'Penerima Bantuan' ? 'border-rose-500 ring-2 ring-rose-500/15' : 'border-slate-200/90 hover:border-rose-300' }} p-4 shadow-xs transition flex items-center gap-3.5 ra-card-hover">
                 <div class="w-11 h-11 rounded-xl bg-rose-100 text-rose-700 border border-rose-200 flex items-center justify-center flex-shrink-0">
                     <i data-lucide="clock" class="w-5 h-5"></i>
                 </div>
@@ -45,7 +82,8 @@
                 </div>
             </a>
 
-            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Dalam Renovasi']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Dalam Renovasi' ? 'border-purple-600 ring-2 ring-purple-600/15' : 'border-slate-200/90 hover:border-purple-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
+            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Dalam Renovasi']) }}"
+               class="bg-white rounded-2xl border {{ request('status') === 'Dalam Renovasi' ? 'border-purple-600 ring-2 ring-purple-600/15' : 'border-slate-200/90 hover:border-purple-300' }} p-4 shadow-xs transition flex items-center gap-3.5 ra-card-hover">
                 <div class="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 border border-purple-200 flex items-center justify-center flex-shrink-0">
                     <i data-lucide="building-2" class="w-5 h-5"></i>
                 </div>
@@ -55,7 +93,8 @@
                 </div>
             </a>
 
-            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Selesai']) }}" class="bg-white rounded-2xl border {{ request('status') === 'Selesai' ? 'border-teal-600 ring-2 ring-teal-600/15' : 'border-slate-200/90 hover:border-teal-300' }} p-4 shadow-xs transition flex items-center gap-3.5">
+            <a href="{{ route('bantuan.index', ['mode' => 'progres', 'status' => 'Selesai']) }}"
+               class="bg-white rounded-2xl border {{ request('status') === 'Selesai' ? 'border-teal-600 ring-2 ring-teal-600/15' : 'border-slate-200/90 hover:border-teal-300' }} p-4 shadow-xs transition flex items-center gap-3.5 ra-card-hover">
                 <div class="w-11 h-11 rounded-xl bg-teal-100 text-teal-800 border border-teal-200 flex items-center justify-center flex-shrink-0">
                     <i data-lucide="check-circle-2" class="w-5 h-5"></i>
                 </div>
@@ -71,10 +110,10 @@
         {{-- ======================================================================= --}}
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider">VERIFIKASI &amp; PENETAPAN BANTUAN</p>
+                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider">PROGRAM BANTUAN RENOVASI</p>
                 <h1 class="text-2xl font-extrabold text-slate-900 mt-1">Daftar Penerima Bantuan</h1>
                 <p class="text-xs text-slate-500 mt-0.5">
-                    Seluruh rumah warga yang telah ditetapkan sebagai penerima bantuan renovasi.
+                    Daftar rumah yang telah ditetapkan sebagai penerima bantuan renovasi.
                 </p>
             </div>
             <div class="inline-flex items-center gap-2 bg-white border border-slate-200/80 px-4 py-2.5 rounded-xl shadow-xs self-start sm:self-auto">
@@ -84,7 +123,7 @@
         </div>
     @endif
 
-    {{-- Baris Pencarian, Filter & Ekspor --}}
+    {{-- Baris Pencarian, Filter & Ekspor (Mockup Page 7 & Page 12) --}}
     <form method="GET" action="{{ route('bantuan.index') }}" class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
         @if ($isProgresMode)
             <input type="hidden" name="mode" value="progres">
@@ -96,13 +135,13 @@
             <input type="text"
                    name="search"
                    value="{{ request('search') }}"
-                   placeholder="{{ $isProgresMode ? 'Cari nama, alamat, atau ID rumah...' : 'Cari nama pemilik, alamat, atau ID rumah...' }}"
+                   placeholder="{{ $isProgresMode ? 'Cari penerima bantuan...' : 'Cari nama, alamat, atau ID rumah...' }}"
                    class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest text-slate-800 placeholder-slate-400 shadow-xs transition">
         </div>
 
-        {{-- Filter Wilayah & Status --}}
+        {{-- Filter Wilayah, Status / Tahap, & Tombol Ekspor --}}
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            <div class="relative w-full sm:w-52">
+            <div class="relative w-full sm:w-48">
                 <i data-lucide="map" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 <select name="wilayah_id" onchange="this.form.submit()"
                         class="w-full pl-10 pr-8 py-2.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest text-slate-700 appearance-none shadow-xs cursor-pointer transition">
@@ -116,13 +155,13 @@
                 <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             </div>
 
-            <div class="relative w-full sm:w-56">
+            <div class="relative w-full sm:w-52">
                 <i data-lucide="layers" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 <select name="status" onchange="this.form.submit()"
                         class="w-full pl-10 pr-8 py-2.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest text-slate-700 appearance-none shadow-xs cursor-pointer transition">
-                    <option value="">{{ $isProgresMode ? 'Semua Status Renovasi' : 'Semua Status Bantuan' }}</option>
+                    <option value="">Semua Status Renovasi</option>
                     <option value="Penerima Bantuan" {{ request('status') === 'Penerima Bantuan' ? 'selected' : '' }}>
-                        {{ $isProgresMode ? 'Belum Dimulai' : 'Penerima Bantuan' }}
+                        {{ $isProgresMode ? 'Belum Dimulai' : 'Penerima Bantuan (Belum Dimulai)' }}
                     </option>
                     <option value="Dalam Renovasi" {{ request('status') === 'Dalam Renovasi' ? 'selected' : '' }}>Dalam Renovasi</option>
                     <option value="Selesai" {{ request('status') === 'Selesai' ? 'selected' : '' }}>Selesai</option>
@@ -130,20 +169,45 @@
                 <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             </div>
 
+            @if ($isProgresMode)
+                <div class="relative w-full sm:w-44">
+                    <i data-lucide="clipboard-list" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                    <select name="tahap" onchange="this.form.submit()"
+                            class="w-full pl-10 pr-8 py-2.5 text-xs font-semibold bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest/20 focus:border-forest text-slate-700 appearance-none shadow-xs cursor-pointer transition">
+                        <option value="">Semua Tahap</option>
+                        @foreach (['Persiapan', 'Pondasi', 'Pekerjaan Atap', 'Pekerjaan Dinding', 'Pekerjaan Lantai', 'Finishing'] as $th)
+                            <option value="{{ $th }}" {{ request('tahap') === $th ? 'selected' : '' }}>{{ $th }}</option>
+                        @endforeach
+                    </select>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                </div>
+            @endif
+
             @if (request()->hasAny(['search', 'wilayah_id', 'status', 'tahap']))
-                <a href="{{ route('bantuan.index', $isProgresMode ? ['mode' => 'progres'] : []) }}" class="px-3 py-2.5 text-xs font-medium text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition flex items-center justify-center gap-1">
+                <a href="{{ route('bantuan.index', $isProgresMode ? ['mode' => 'progres'] : []) }}"
+                   class="px-3 py-2.5 text-xs font-medium text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition flex items-center justify-center gap-1">
                     <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
                 </a>
             @endif
 
-            @if ($isProgresMode)
-                <div class="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                    <a href="{{ route('bantuan.rekap') }}"
-                       class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition">
-                        <i data-lucide="download" class="w-3.5 h-3.5 text-forest"></i>
-                        Ekspor
-                    </a>
-                </div>
+            {{-- Tombol Ekspor Excel & PDF sesuai Mockup Page 7 --}}
+            @if (!$isProgresMode)
+                @canany(['verifikator', 'admin'])
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('bantuan.ekspor', array_merge($queryExportBase, ['format' => 'excel'])) }}"
+                           class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition ra-btn-press"
+                           title="Unduh Daftar Penerima Bantuan (.xlsx)">
+                            <i data-lucide="download" class="w-3.5 h-3.5 text-forest"></i>
+                            <span>Excel</span>
+                        </a>
+                        <a href="{{ route('bantuan.ekspor', array_merge($queryExportBase, ['format' => 'pdf'])) }}"
+                           class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition ra-btn-press"
+                           title="Unduh Daftar Penerima Bantuan (.pdf)">
+                            <i data-lucide="download" class="w-3.5 h-3.5 text-forest"></i>
+                            <span>PDF</span>
+                        </a>
+                    </div>
+                @endcanany
             @endif
         </div>
     </form>
@@ -154,16 +218,16 @@
             <div>
                 @if ($isProgresMode)
                     <h2 class="text-base font-bold text-slate-900">Progres Penerima Bantuan</h2>
-                    <p class="text-xs text-slate-400 mt-0.5">Ringkasan pembaruan dari Surveyor lapangan</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Ringkasan pembaruan dari Surveyor lapangan &middot; Klik baris untuk melihat Detail Monitoring</p>
                 @else
                     <h2 class="text-base font-bold text-slate-900">Seluruh Penerima Bantuan</h2>
                     <span class="sr-only">Progres Penerima Bantuan</span>
-                    <p class="text-xs text-slate-400 mt-0.5">Data warga yang telah lolos verifikasi kelayakan</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Diperbarui berdasarkan aktivitas renovasi terakhir</p>
                 @endif
             </div>
             <div class="text-xs text-slate-400 font-medium">
                 @if ($rumah->total() > 0)
-                    Menampilkan {{ $rumah->count() }} dari {{ $rumah->total() }} {{ $isProgresMode ? 'penerima' : 'data' }}
+                    Menampilkan {{ $rumah->firstItem() }}–{{ $rumah->lastItem() }} dari {{ $rumah->total() }} {{ $isProgresMode ? 'penerima' : 'data' }}
                 @else
                     0 data ditampilkan
                 @endif
@@ -191,6 +255,7 @@
                                 <th class="py-3 px-4 text-left">STATUS</th>
                                 <th class="py-3 px-4 text-left">PROGRESS</th>
                                 <th class="py-3 px-4 text-left">UPDATE TERAKHIR</th>
+                                <th class="py-3 px-4 text-left">SURVEYOR</th>
                             @else
                                 <th class="py-3 px-4 text-left">TANGGAL PENETAPAN</th>
                                 <th class="py-3 px-4 text-left">STATUS BANTUAN</th>
@@ -220,11 +285,23 @@
                             $label = $isProgresMode && $r->status === 'Penerima Bantuan'
                                 ? 'Belum Dimulai'
                                 : $r->status;
+
+                            // Target URL:
+                            // - Pada halaman Daftar Penerima Bantuan -> DETAIL PENERIMA BANTUAN (bantuan.penerima.show)
+                            // - Pada halaman Progres Renovasi -> REVIEW PENYELESAIAN RENOVASI (bantuan.show)
+                            $targetActionUrl = $isProgresMode
+                                ? route('bantuan.show', $r)
+                                : route('bantuan.penerima.show', $r);
                         @endphp
-                        {{-- Klik baris membuka Slide-over Detail Monitoring di sisi kanan (Mockup Page 9) --}}
-                        <tr @click="activeDrawerId = {{ $r->id }}"
-                            :class="activeDrawerId === {{ $r->id }} ? 'bg-forest/5' : 'hover:bg-slate-50/80'"
-                            class="cursor-pointer transition">
+                        {{-- Pada mode Progres Renovasi, klik baris membuka Slide-over Detail Monitoring di sisi kanan (Mockup Page 9) --}}
+                        {{-- Pada mode Daftar Penerima Bantuan, klik baris mengarah ke halaman Detail Penerima Bantuan (Mockup Page 11) --}}
+                        <tr @if ($isProgresMode)
+                                @click="activeDrawerId = {{ $r->id }}"
+                                :class="activeDrawerId === {{ $r->id }} ? 'bg-forest/5' : 'hover:bg-slate-50/80'"
+                            @else
+                                onclick="window.location.href='{{ $targetActionUrl }}'"
+                            @endif
+                            class="cursor-pointer transition ra-row-hover">
                             {{-- Nama Pemilik & ID --}}
                             <td class="py-3.5 px-6">
                                 <div class="font-bold text-slate-900 leading-snug">{{ $r->nama_kepala_keluarga }}</div>
@@ -275,7 +352,7 @@
                             <td class="py-3.5 px-4 whitespace-nowrap">
                                 <div class="flex items-center gap-3">
                                     <div class="w-24 bg-slate-200/90 rounded-full h-1.5 overflow-hidden flex-shrink-0">
-                                        <div class="bg-forest h-1.5 rounded-full" style="width: {{ $persen }}%"></div>
+                                        <div class="bg-forest h-1.5 rounded-full transition-all duration-500" style="width: {{ $persen }}%"></div>
                                     </div>
                                     <span class="text-xs font-bold text-slate-700">{{ $persen }}%</span>
                                 </div>
@@ -286,12 +363,21 @@
                                 {{ $formattedTerakhir }}
                             </td>
 
-                            {{-- Aksi: Tombol Lingkaran dengan Panah (Mockup Page 7 & Page 12) --}}
+                            @if ($isProgresMode)
+                                {{-- Surveyor --}}
+                                <td class="py-3.5 px-4 text-xs text-slate-600 whitespace-nowrap">
+                                    {{ $r->surveyor?->nama ?? 'Surveyor Lapangan' }}
+                                </td>
+                            @endif
+
+                            {{-- Aksi: Tombol Lingkaran dengan Panah --}}
+                            {{-- Pada Daftar Penerima Bantuan -> Detail Penerima Bantuan (bantuan.penerima.show) --}}
+                            {{-- Pada Progres Renovasi -> Review Penyelesaian Renovasi (bantuan.show) --}}
                             <td class="py-3.5 px-6 text-center whitespace-nowrap" @click.stop>
                                 <div class="flex items-center justify-center">
-                                    <a href="{{ route('bantuan.show', $r) }}"
-                                       class="w-8 h-8 rounded-full border border-slate-200 hover:border-forest hover:bg-forest hover:text-white flex items-center justify-center text-slate-600 transition shadow-xs"
-                                       title="{{ $r->status === 'Penerima Bantuan' ? 'Detail Penerima Bantuan' : 'Review Penyelesaian Renovasi' }}">
+                                    <a href="{{ $targetActionUrl }}"
+                                       class="w-8 h-8 rounded-full border border-slate-200 hover:border-forest hover:bg-forest hover:text-white flex items-center justify-center text-slate-600 transition shadow-xs ra-btn-press"
+                                       title="{{ $isProgresMode ? 'Review Penyelesaian Renovasi' : 'Detail Penerima Bantuan' }}">
                                         <i data-lucide="arrow-right" class="w-4 h-4"></i>
                                     </a>
                                 </div>
@@ -316,6 +402,7 @@
 
     {{-- ======================================================================= --}}
     {{-- SLIDE-OVER DRAWER: DETAIL MONITORING DARI SISI KANAN LAYAR (MOCKUP P.9) --}}
+    {{-- Tombol di dalamnya SELALU mengarah ke REVIEW PENYELESAIAN RENOVASI      --}}
     {{-- ======================================================================= --}}
     @foreach ($rumah as $r)
         @php
@@ -343,7 +430,7 @@
 
             {{-- Backdrop --}}
             <div x-show="activeDrawerId === {{ $r->id }}"
-                 x-transition.opacity
+                 x-transition.opacity.duration.250ms
                  @click="activeDrawerId = null"
                  class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"></div>
 
@@ -439,9 +526,11 @@
                                         @if ($prog->fotos && $prog->fotos->isNotEmpty())
                                             <div class="flex flex-wrap gap-2 mt-2.5">
                                                 @foreach ($prog->fotos->take(3) as $foto)
-                                                    <img src="{{ route('bantuan.progres.foto', $foto) }}"
+                                                    @php $fotoUrl = route('bantuan.progres.foto', $foto); @endphp
+                                                    <img src="{{ $fotoUrl }}"
+                                                         @click.stop="openPhoto('{{ $fotoUrl }}', '{{ $prog->tahap_pekerjaan }} ({{ $prog->persentase }}%) — {{ $r->nama_kepala_keluarga }}')"
                                                          alt="Foto Progres"
-                                                         class="w-20 h-14 object-cover rounded-xl border border-slate-200 shadow-2xs">
+                                                         class="w-20 h-14 object-cover rounded-xl border border-slate-200 shadow-2xs cursor-pointer hover:opacity-85 transition">
                                                 @endforeach
                                             </div>
                                         @endif
@@ -471,10 +560,14 @@
                         </div>
                     </div>
 
-                    {{-- Footer Drawer: Tombol menuju Review Penyelesaian Renovasi (Sama dengan tombol panah pada kolom Aksi) --}}
+                    {{-- Footer Drawer: SELALU menuju halaman REVIEW PENYELESAIAN RENOVASI (route('bantuan.show', $r)) --}}
                     <div class="p-5 border-t border-slate-100 bg-slate-50/60 space-y-2">
+                        <div>
+                            <p class="text-xs font-extrabold text-slate-900">Verifikasi penyelesaian</p>
+                            <p class="text-[11px] text-slate-500 mt-0.5">Tinjau dan tetapkan renovasi selesai di halaman verifikator.</p>
+                        </div>
                         <a href="{{ route('bantuan.show', $r) }}"
-                           class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-sm transition">
+                           class="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-sm transition ra-btn-press">
                             <span>Review Penyelesaian Renovasi</span>
                             <i data-lucide="arrow-right" class="w-4 h-4"></i>
                         </a>
@@ -484,6 +577,114 @@
             </div>
         </div>
     @endforeach
+
+    {{-- ======================================================================= --}}
+    {{-- MODAL POP-UP: EKSPOR DAFTAR PENERIMA / PROGRES RENOVASI                 --}}
+    {{-- ======================================================================= --}}
+    @canany(['verifikator', 'admin'])
+        <div x-show="openExportModal"
+             x-cloak
+             x-transition.opacity.duration.200ms
+             class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 backdrop-blur-xs p-4">
+            <div @click.away="openExportModal = false"
+                 x-show="openExportModal"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+                 x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                 class="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-7 shadow-2xl space-y-5">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-11 h-11 rounded-2xl bg-emerald-50 text-forest flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="download" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-extrabold text-slate-900">
+                                {{ $isProgresMode ? 'Ekspor Monitoring Renovasi' : 'Ekspor Daftar Penerima Bantuan' }}
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-0.5">Pilih format file untuk mengunduh laporan sesuai filter yang aktif.</p>
+                        </div>
+                    </div>
+                    <button type="button" @click="openExportModal = false" class="text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button"
+                            @click="exportFormat = 'excel'"
+                            :class="exportFormat === 'excel' ? 'border-forest bg-emerald-50/40 ring-1 ring-forest' : 'border-slate-200 hover:bg-slate-50'"
+                            class="p-4 rounded-2xl border text-left transition flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="file-spreadsheet" class="w-5 h-5 text-forest flex-shrink-0"></i>
+                            <div>
+                                <p class="text-xs font-extrabold text-slate-900">Excel (.xlsx)</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Unduh laporan dalam format Excel.</p>
+                            </div>
+                        </div>
+                        <span class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                              :class="exportFormat === 'excel' ? 'bg-forest text-white' : 'border border-slate-300'">
+                            <i x-show="exportFormat === 'excel'" data-lucide="check" class="w-3 h-3"></i>
+                        </span>
+                    </button>
+
+                    <button type="button"
+                            @click="exportFormat = 'pdf'"
+                            :class="exportFormat === 'pdf' ? 'border-forest bg-emerald-50/40 ring-1 ring-forest' : 'border-slate-200 hover:bg-slate-50'"
+                            class="p-4 rounded-2xl border text-left transition flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="file-text" class="w-5 h-5 text-forest flex-shrink-0"></i>
+                            <div>
+                                <p class="text-xs font-extrabold text-slate-900">PDF (.pdf)</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5">Unduh laporan dalam format PDF.</p>
+                            </div>
+                        </div>
+                        <span class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                              :class="exportFormat === 'pdf' ? 'bg-forest text-white' : 'border border-slate-300'">
+                            <i x-show="exportFormat === 'pdf'" data-lucide="check" class="w-3 h-3"></i>
+                        </span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2.5 text-xs text-forest bg-emerald-50/80 border border-emerald-200/70 rounded-xl px-4 py-3">
+                    <i data-lucide="shield-check" class="w-4 h-4 flex-shrink-0"></i>
+                    <span>NIK pada hasil ekspor ditampilkan tersamar. Aktivitas ini tercatat di audit log.</span>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 pt-1">
+                    <button type="button" @click="openExportModal = false" class="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
+                        Batal
+                    </button>
+                    <a :href="'{{ route('bantuan.ekspor', $queryExportBase) }}' + ({{ count($queryExportBase) > 0 ? "'&format='" : "'?format='" }} + exportFormat)"
+                       @click="openExportModal = false"
+                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-sm transition ra-btn-press">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>Ekspor</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    @endcanany
+
+    {{-- ======================================================================= --}}
+    {{-- MODAL POP-UP: LIGHTBOX PREVIEW FOTO DOKUMENTASI                         --}}
+    {{-- ======================================================================= --}}
+    <div x-show="lightboxOpen"
+         x-cloak
+         x-transition.opacity.duration.200ms
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xs"
+         @click.self="lightboxOpen = false">
+        <div class="bg-white rounded-3xl max-w-3xl w-full overflow-hidden shadow-2xl border border-slate-200">
+            <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <h4 class="text-xs font-extrabold text-slate-900" x-text="lightboxTitle"></h4>
+                <button type="button" @click="lightboxOpen = false" class="w-8 h-8 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="p-4 bg-slate-950/5 flex items-center justify-center">
+                <img :src="lightboxImage" alt="Preview Dokumentasi" class="max-h-[72vh] w-auto object-contain rounded-xl shadow-sm">
+            </div>
+        </div>
+    </div>
 
 </div>
 @endsection

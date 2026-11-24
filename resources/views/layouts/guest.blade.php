@@ -34,7 +34,16 @@
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     
-    <style>[x-cloak] { display: none !important; }</style>
+    <style>
+        [x-cloak] { display: none !important; }
+        @keyframes raGuestFadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        body > * {
+            animation: raGuestFadeIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+    </style>
 </head>
 <body class="h-full bg-cream font-sans">
     @yield('content')

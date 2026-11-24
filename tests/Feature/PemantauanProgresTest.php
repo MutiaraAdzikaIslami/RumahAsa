@@ -87,7 +87,29 @@ class PemantauanProgresTest extends TestCase
         $this->actingAs($this->buatUser('verifikator'))
             ->get("/bantuan/{$rumah->id}")
             ->assertOk()
+            ->assertSee('REVIEW PENYELESAIAN RENOVASI')
             ->assertSee('Tetapkan Selesai')
             ->assertDontSee('Kelola Progres');
+    }
+
+    public function test_halaman_detail_penerima_bantuan_dan_review_penyelesaian_terpisah(): void
+    {
+        $rumah = $this->buatRumah('Penerima Bantuan', 'Warga Belum Dicatat');
+        $verifikator = $this->buatUser('verifikator');
+
+        // 1. Halaman Detail Penerima Bantuan (/bantuan/{id}/detail-penerima) menampilkan DETAIL PENERIMA BANTUAN & modal Catat Bantuan
+        $this->actingAs($verifikator)
+            ->get("/bantuan/{$rumah->id}/detail-penerima")
+            ->assertOk()
+            ->assertSee('DETAIL PENERIMA BANTUAN')
+            ->assertSee('Catat Bantuan')
+            ->assertDontSee('REVIEW PENYELESAIAN RENOVASI');
+
+        // 2. Halaman Review Penyelesaian Renovasi (/bantuan/{id}) SELALU menampilkan REVIEW PENYELESAIAN RENOVASI
+        $this->actingAs($verifikator)
+            ->get("/bantuan/{$rumah->id}")
+            ->assertOk()
+            ->assertSee('REVIEW PENYELESAIAN RENOVASI')
+            ->assertDontSee('DETAIL PENERIMA BANTUAN');
     }
 }

@@ -326,10 +326,12 @@
                 <button type="button" @click="openExportModal = false" class="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
                     Batal
                 </button>
-                <button type="button" @click="window.print(); openExportModal = false" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-sm transition">
+                <a :href="'{{ route('bantuan.rekap.ekspor', array_filter(['tahun' => $tahun, 'triwulan' => $triwulan, 'wilayah_id' => $wilayahId, 'sumber_program' => $sumberProgram, 'search' => $search])) }}' + ({{ count(array_filter(['tahun' => $tahun, 'triwulan' => $triwulan, 'wilayah_id' => $wilayahId, 'sumber_program' => $sumberProgram, 'search' => $search])) > 0 ? "'&format='" : "'?format='" }} + exportFormat)"
+                   @click="openExportModal = false"
+                   class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-forest hover:bg-forest-light text-white text-xs font-bold shadow-sm transition ra-btn-press">
                     <i data-lucide="download" class="w-4 h-4"></i>
                     <span>Ekspor</span>
-                </button>
+                </a>
             </div>
         </div>
     </div>

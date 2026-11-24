@@ -35,6 +35,11 @@ class SurveiKelayakan extends Model
         return $this->hasMany(SurveiKomponen::class, 'survei_id');
     }
 
+    public function komponen(): HasMany
+    {
+        return $this->komponenSurvei();
+    }
+
     /**
      * Cek apakah survei sudah lengkap untuk diajukan (UC-05)
      * - 7 komponen semua terisi opsi kondisi
