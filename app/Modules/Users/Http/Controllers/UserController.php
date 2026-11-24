@@ -2,172 +2,238 @@
 
 namespace App\Modules\Users\Http\Controllers;
 
-use App\Models\AuditLog;
+use App\Models\Role;
 use App\Models\User;
+use App\Models\Wilayah;
 use App\Modules\Core\Services\AuditLogger;
 use App\Modules\Users\Http\Requests\StoreUserRequest;
 use App\Modules\Users\Http\Requests\UpdateUserRequest;
 use App\Modules\Users\Services\UserService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class UserController extends Controller
 {
     public function __construct(
-        private readonly UserService $service,
+        private readonly UserService $userService,
         private readonly AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): View|JsonResponse
     {
-        $query = User::query()
-            ->with(['role:id,kode,nama', 'wilayah:id,kode,nama,tingkat']);
+        $query = User::with(['role', 'wilayah']);
 
-        if ($roleId = $request->query('role_id')) {
-            $query->where('role_id', $roleId);
-        }
-        if ($request->has('is_aktif')) {
-            $query->where('is_aktif', $request->boolean('is_aktif'));
-        }
-        if ($search = $request->query('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
-                  ->orWhere('username', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+        if ($search = $request->input('q')) {
+            $searchLower = strtolower($search);
+            $query->where(function ($q) use ($searchLower) {
+                $q->whereRaw('LOWER(username) LIKE ?', ["%{$searchLower}%"])
+                    ->orWhereRaw('LOWER(nama) LIKE ?', ["%{$searchLower}%"])
+                    ->orWhereRaw('LOWER(email) LIKE ?', ["%{$searchLower}%"]);
             });
         }
-        if ($request->boolean('with_trashed')) {
-            $query->withTrashed();
+
+        if ($roleId = $request->input('role_id')) {
+            $query->where('role_id', (int) $roleId);
         }
 
-        return response()->json(
-            $query->orderBy('nama')->paginate(20)
-        );
+        $users = $query->orderBy('id')->paginate(15)->withQueryString();
+
+        if ($request->wantsJson()) {
+            return response()->json($users);
+        }
+
+        $roles = collect($this->userService->listRoles());
+
+        return view('users.index', compact('users', 'roles'));
     }
 
-    public function show(User $user): JsonResponse
+    public function show(Request $request, User $user): JsonResponse|RedirectResponse
     {
-        return response()->json(
-            $user->load(['role:id,kode,nama', 'wilayah:id,kode,nama,tingkat'])
-        );
+        if ($request->wantsJson()) {
+            return response()->json($user->load(['role', 'wilayah']));
+        }
+
+        return redirect()->route('users.edit', $user);
     }
 
-    public function store(StoreUserRequest $request): JsonResponse
+    public function create(): View
     {
-        try {
-            $result = $this->service->create($request->validated());
+        $roles = collect($this->userService->listRoles());
 
-            $this->auditLogger->catat(
-                aksi:      AuditLog::AKSI['USER_CREATE'],
-                entitas:   'users',
-                entitasId: $result['user']->id,
-                dataBaru:  ['username' => $result['user']->username, 'role_id' => $result['user']->role_id],
-            );
+        $kabupatenList = Wilayah::where('tingkat', Wilayah::TINGKAT_KABUPATEN_KOTA)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
 
+        $kecamatanList = Wilayah::where('tingkat', Wilayah::TINGKAT_KECAMATAN)
+            ->orderBy('nama')
+            ->get(['id', 'parent_id', 'kode', 'nama']);
+
+        return view('users.create', compact('roles', 'kabupatenList', 'kecamatanList'));
+    }
+
+    public function store(StoreUserRequest $request): JsonResponse|RedirectResponse
+    {
+        $result = $this->userService->createUser($request->validated());
+
+        if ($request->wantsJson()) {
             return response()->json([
-                'message'            => 'User berhasil dibuat. Password sementara ditampilkan sekali.',
-                'user'               => $result['user']->load('role', 'wilayah'),
-                'password_sementara' => $result['password_sementara'],
+                'message'            => "User '{$result['user']->nama}' berhasil dibuat.",
+                'user'               => $result['user']->load(['role', 'wilayah']),
+                'password_sementara' => $result['password_plaintext'],
             ], 201);
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
         }
+
+        return redirect()
+            ->route('users.index')
+            ->with('success', "User '{$result['user']->nama}' berhasil dibuat.")
+            ->with('generated_password', $result['password_plaintext'])
+            ->with('generated_username', $result['user']->username);
     }
 
-    public function update(UpdateUserRequest $request, User $user): JsonResponse
+    public function edit(User $user): View
     {
-        try {
-            $dataLama = $user->only(['nama', 'username', 'email', 'role_id', 'wilayah_id', 'is_aktif']);
-            $updated = $this->service->update($user, $request->validated());
-            $dataBaru = $updated->only(['nama', 'username', 'email', 'role_id', 'wilayah_id', 'is_aktif']);
+        $roles = collect($this->userService->listRoles());
+        $kabupatenList = Wilayah::where('tingkat', Wilayah::TINGKAT_KABUPATEN_KOTA)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
 
-            $this->auditLogger->catat(
-                aksi:      AuditLog::AKSI['USER_UPDATE'],
-                entitas:   'users',
-                entitasId: $user->id,
-                dataBaru:  $dataBaru,
-                dataLama:  $dataLama,
-            );
+        $kecamatanList = Wilayah::where('tingkat', Wilayah::TINGKAT_KECAMATAN)
+            ->orderBy('nama')
+            ->get(['id', 'parent_id', 'kode', 'nama']);
 
-            return response()->json($updated->load('role', 'wilayah'));
-        } catch (\InvalidArgumentException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
+        return view('users.create', [
+            'user'          => $user,
+            'roles'         => $roles,
+            'kabupatenList' => $kabupatenList,
+            'kecamatanList' => $kecamatanList,
+        ]);
     }
 
-    /**
-     * FR-07: Admin reset password user.
-     * Generate password sementara baru + set must_change_password=true.
-     */
-    public function resetPassword(User $user): JsonResponse
+    public function update(UpdateUserRequest $request, User $user): JsonResponse|RedirectResponse
     {
-        try {
-            $result = $this->service->resetPassword($user);
+        $updated = $this->userService->updateUser($user, $request->validated());
 
-            $this->auditLogger->catat(
-                aksi:      AuditLog::AKSI['PASSWORD_RESET_BY_ADMIN'],
-                entitas:   'users',
-                entitasId: $user->id,
-                dataBaru:  ['must_change_password' => true, 'password_changed_at' => null],
-            );
-
+        if ($request->wantsJson()) {
             return response()->json([
-                'message'            => 'Password berhasil direset. Password sementara ditampilkan sekali.',
-                'user'               => $result['user']->load('role', 'wilayah'),
-                'password_sementara' => $result['password_sementara'],
+                'message' => "User '{$updated->nama}' berhasil diperbarui.",
+                'user'    => $updated->load(['role', 'wilayah']),
             ]);
-        } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
         }
+
+        return redirect()
+            ->route('users.index')
+            ->with('success', "User '{$updated->nama}' berhasil diperbarui.");
     }
 
-    public function toggleAktif(User $user): JsonResponse
+    public function destroy(Request $request, User $user): JsonResponse|RedirectResponse|Response
     {
+        if ($user->id === Auth::id()) {
+            $msg = 'Anda tidak dapat menghapus akun sendiri.';
+            return $request->wantsJson()
+                ? response()->json(['message' => $msg], 422)
+                : back()->with('error', $msg);
+        }
+
+        $adminRole = Role::where('kode', 'admin')->first();
+        if ($adminRole && $user->role_id === $adminRole->id) {
+            $adminCount = User::where('role_id', $adminRole->id)->where('is_aktif', true)->count();
+            if ($adminCount <= 1) {
+                $msg = 'Tidak dapat menghapus admin terakhir.';
+                return $request->wantsJson()
+                    ? response()->json(['message' => $msg], 422)
+                    : back()->with('error', $msg);
+            }
+        }
+
+        $this->userService->deleteUser($user);
+
+        if ($request->wantsJson()) {
+            return response()->noContent();
+        }
+
+        return redirect()
+            ->route('users.index')
+            ->with('success', "User '{$user->nama}' telah dihapus (soft-delete).");
+    }
+
+    public function restore(Request $request, ?int $userId = null): JsonResponse|RedirectResponse
+    {
+        $targetId = $userId ?? (int) $request->input('user_id');
+        $user = $this->userService->restoreUser($targetId);
+
+        if (! $user) {
+            return $request->wantsJson()
+                ? response()->json(['message' => 'User tidak ditemukan.'], 404)
+                : back()->with('error', 'User tidak ditemukan.');
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json(['message' => "User '{$user->nama}' berhasil dipulihkan.", 'user' => $user->load(['role', 'wilayah'])]);
+        }
+
+        return redirect()
+            ->route('users.index')
+            ->with('success', "User '{$user->nama}' berhasil dipulihkan.");
+    }
+
+    public function resetPassword(Request $request, User $user): JsonResponse|RedirectResponse
+    {
+        if ($user->id === Auth::id()) {
+            $msg = 'Anda tidak dapat mereset password akun sendiri.';
+            return $request->wantsJson()
+                ? response()->json(['message' => $msg], 422)
+                : back()->with('error', $msg);
+        }
+
+        $result = $this->userService->resetPassword($user);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message'            => "Password user '{$user->nama}' telah di-reset.",
+                'user'               => $result['user']->load(['role', 'wilayah']),
+                'password_sementara' => $result['password_plaintext'],
+            ]);
+        }
+
+        return redirect()
+            ->route('users.index')
+            ->with('success', "Password user '{$user->nama}' telah di-reset.")
+            ->with('generated_password', $result['password_plaintext'])
+            ->with('generated_username', $user->username);
+    }
+
+    public function toggleAktif(Request $request, User $user): JsonResponse|RedirectResponse
+    {
+        if ($user->id === Auth::id()) {
+            $msg = 'Anda tidak dapat menonaktifkan akun sendiri.';
+            return $request->wantsJson()
+                ? response()->json(['message' => $msg], 422)
+                : back()->with('error', $msg);
+        }
+
         try {
-            $updated = $this->service->toggleAktif($user);
-
-            $this->auditLogger->catat(
-                aksi:      $updated->is_aktif ? AuditLog::AKSI['USER_ACTIVATE'] : AuditLog::AKSI['USER_DEACTIVATE'],
-                entitas:   'users',
-                entitasId: $user->id,
-                dataBaru:  ['is_aktif' => $updated->is_aktif],
-            );
-
-            return response()->json($updated);
+            $updated = $this->userService->toggleAktif($user);
         } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            return $request->wantsJson()
+                ? response()->json(['message' => $e->getMessage()], 422)
+                : back()->with('error', $e->getMessage());
         }
-    }
 
-    public function destroy(User $user): JsonResponse
-    {
-        try {
-            $this->auditLogger->catat(
-                aksi:      AuditLog::AKSI['USER_DELETE'],
-                entitas:   'users',
-                entitasId: $user->id,
-                dataLama:  $user->only(['username', 'nama', 'role_id']),
-            );
-
-            $this->service->delete($user);
-            return response()->json(null, 204);
-        } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message'  => "Status aktif user '{$updated->nama}' diubah.",
+                'is_aktif' => $updated->is_aktif,
+                'user'     => $updated->load(['role', 'wilayah']),
+            ]);
         }
-    }
 
-    public function restore(int $userId): JsonResponse
-    {
-        $user = $this->service->restore($userId);
-
-        $this->auditLogger->catat(
-            aksi:      AuditLog::AKSI['USER_RESTORE'],
-            entitas:   'users',
-            entitasId: $user->id,
-        );
-
-        return response()->json($user->load('role', 'wilayah'));
+        return redirect()
+            ->route('users.index')
+            ->with('success', "Status aktif user '{$updated->nama}' diubah.");
     }
 }

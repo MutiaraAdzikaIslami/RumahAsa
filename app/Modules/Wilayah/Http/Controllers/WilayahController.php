@@ -107,4 +107,51 @@ class WilayahController extends Controller
 
         return response()->json($children);
     }
+
+    /**
+     * API: Ambil list Kabupaten/Kota.
+     */
+    public function getKabupaten(): JsonResponse
+    {
+        $data = Wilayah::where('tingkat', Wilayah::TINGKAT_KABUPATEN_KOTA)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    /**
+     * API: Ambil list Kecamatan by kabupaten_id.
+     */
+    public function getKecamatan(Request $request, int $kabupatenId): JsonResponse
+    {
+        $data = Wilayah::where('tingkat', Wilayah::TINGKAT_KECAMATAN)
+            ->where('parent_id', $kabupatenId)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    /**
+     * API: Ambil list Kelurahan/Desa by kecamatan_id.
+     */
+    public function getKelurahan(Request $request, int $kecamatanId): JsonResponse
+    {
+        $data = Wilayah::where('tingkat', Wilayah::TINGKAT_KELURAHAN)
+            ->where('parent_id', $kecamatanId)
+            ->orderBy('nama')
+            ->get(['id', 'kode', 'nama']);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
 }

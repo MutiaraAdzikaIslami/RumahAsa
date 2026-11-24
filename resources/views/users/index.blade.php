@@ -1,102 +1,259 @@
 @extends('layouts.app')
 
-@section('title', 'Kelola User')
+@section('title', 'RumahAsa - Manajemen User')
+@section('header', 'Data User')
 
 @section('content')
-<div x-data="userManager()" x-init="loadUsers()" class="space-y-4">
-    <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold text-slate-900">Kelola User</h1>
-        <button @click="openForm()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg">+ Tambah User</button>
+<div class="space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-gold-600">Administrasi Akses</p>
+            <h1 class="mt-1 text-3xl font-bold text-forest-900">Manajemen User</h1>
+            <p class="mt-1 text-sm text-forest-600">Kelola akun, role, dan wilayah tugas pengguna RumahAsa.</p>
+        </div>
+        <a href="{{ route('users.create') }}"
+           class="inline-flex items-center justify-center gap-2 rounded-xl bg-forest-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-forest-800">
+            <i data-lucide="plus" class="h-4 w-4"></i>
+            Tambah User
+        </a>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-4">
-        <template x-if="loading"><p class="text-slate-500 text-sm">Memuat...</p></template>
-        <template x-if="!loading && users.data.length === 0">
-            <p class="text-slate-500 text-sm">Belum ada user.</p>
-        </template>
-        <table class="w-full text-sm" x-show="!loading && users.data.length > 0">
-            <thead>
-                <tr class="text-left border-b border-slate-200">
-                    <th class="py-2 px-2">Nama</th>
-                    <th class="py-2 px-2">Username</th>
-                    <th class="py-2 px-2">Role</th>
-                    <th class="py-2 px-2">Wilayah</th>
-                    <th class="py-2 px-2">Status</th>
-                    <th class="py-2 px-2">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                <template x-for="u in users.data" :key="u.id">
-                    <tr class="border-b border-slate-100">
-                        <td class="py-2 px-2" x-text="u.nama"></td>
-                        <td class="py-2 px-2" x-text="u.username"></td>
-                        <td class="py-2 px-2"><span class="px-2 py-0.5 rounded text-xs bg-slate-100" x-text="u.role?.nama"></span></td>
-                        <td class="py-2 px-2" x-text="u.wilayah?.nama ?? '-'"></td>
-                        <td class="py-2 px-2">
-                            <span class="px-2 py-0.5 rounded text-xs" :class="u.is_aktif ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'" x-text="u.is_aktif ? 'Aktif' : 'Nonaktif'"></span>
-                        </td>
-                        <td class="py-2 px-2 space-x-2 text-xs">
-                            <button @click="edit(u)" class="text-emerald-600 hover:underline">Edit</button>
-                            <button @click="toggleAktif(u)" class="text-amber-600 hover:underline" x-text="u.is_aktif ? 'Nonaktifkan' : 'Aktifkan'"></button>
-                            <button @click="remove(u)" class="text-red-600 hover:underline">Hapus</button>
-                        </td>
-                    </tr>
-                </template>
-            </tbody>
-        </table>
-    </div>
-
-    {{-- Stub form modal — kerjakan di frontend --}}
-    <div x-show="showForm" x-cloak class="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-            <h3 class="text-lg font-semibold mb-4" x-text="editingId ? 'Edit User' : 'Tambah User'"></h3>
-            <p class="text-sm text-slate-500">Form create/edit + role + wilayah — kerjakan di frontend.</p>
-            <div class="flex justify-end mt-4 space-x-2">
-                <button @click="showForm = false" class="px-4 py-2 text-sm bg-slate-200 hover:bg-slate-300 rounded">Tutup</button>
+    <div class="rounded-2xl border border-forest-100 bg-white p-5 shadow-sm">
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div>
+                <p class="text-xs font-medium uppercase tracking-wide text-forest-500">Total User</p>
+                <p class="text-2xl font-bold text-forest-900">{{ $users->total() }}</p>
             </div>
+            <div class="border-l border-forest-100 pl-4">
+                <p class="text-xs font-medium uppercase tracking-wide text-forest-500">Akun Aktif</p>
+                <p class="text-2xl font-bold text-forest-600">{{ \App\Models\User::where('is_aktif', true)->count() }}</p>
+            </div>
+            <div class="border-l border-forest-100 pl-4">
+                <p class="text-xs font-medium uppercase tracking-wide text-forest-500">Akun Nonaktif</p>
+                <p class="text-2xl font-bold text-forest-400">{{ \App\Models\User::where('is_aktif', false)->count() }}</p>
+            </div>
+        </div>
+        <div class="mt-3 flex items-center gap-2 border-t border-forest-100 pt-3 text-xs text-forest-600">
+            <i data-lucide="shield-check" class="h-4 w-4 text-forest-500"></i>
+            <span>Hak akses mengikuti role dan wilayah tugas pengguna.</span>
+        </div>
+    </div>
+
+    <form method="GET" class="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+        <div class="relative">
+            <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-forest-400"></i>
+            <input type="text" name="q" value="{{ request('q') }}" placeholder="Cari nama atau email user..."
+                   class="w-full rounded-xl border border-forest-100 bg-white py-2.5 pl-10 pr-4 text-sm text-forest-900 placeholder-forest-400 focus:border-forest-400 focus:outline-none focus:ring-2 focus:ring-forest-400/30">
+        </div>
+        <select name="role_id" class="rounded-xl border border-forest-100 bg-white px-4 py-2.5 text-sm text-forest-700 focus:border-forest-400 focus:outline-none">
+            <option value="">Semua Role</option>
+            @foreach ($roles as $r)
+                <option value="{{ $r['id'] }}" @selected(request('role_id') == $r['id'])>{{ $r['nama'] }}</option>
+            @endforeach
+        </select>
+        <div class="flex gap-2">
+            <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-forest-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-forest-800">
+                <i data-lucide="filter" class="h-4 w-4"></i> Filter
+            </button>
+            <a href="{{ route('users.index') }}" class="rounded-xl border border-forest-100 bg-white px-4 py-2.5 text-sm font-medium text-forest-700 hover:bg-cream-50">Reset</a>
+        </div>
+    </form>
+
+    <div class="rounded-2xl border border-forest-100 bg-white shadow-sm">
+        <div class="flex items-center justify-between border-b border-forest-100 px-6 py-4">
+            <div>
+                <h3 class="font-bold text-forest-900">Daftar User</h3>
+                <p class="text-xs text-forest-500">{{ $users->total() }} pengguna terdaftar pada sistem</p>
+            </div>
+            <p class="text-xs text-forest-500">Menampilkan {{ $users->firstItem() ?? 0 }}-{{ $users->lastItem() ?? 0 }} dari {{ $users->total() }}</p>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-forest-50 text-sm">
+                <thead class="text-left text-xs font-semibold uppercase tracking-wide text-forest-500">
+                    <tr>
+                        <th class="px-6 py-3">Nama</th>
+                        <th class="px-6 py-3">Email</th>
+                        <th class="px-6 py-3">Role</th>
+                        <th class="px-6 py-3">Wilayah Tugas</th>
+                        <th class="px-6 py-3">Status</th>
+                        <th class="px-6 py-3 text-right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-forest-50">
+                    @forelse ($users as $u)
+                        <tr class="hover:bg-cream-50/50">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="grid h-9 w-9 place-items-center rounded-xl bg-forest-700 text-xs font-bold text-white">
+                                        {{ strtoupper(substr($u->nama, 0, 2)) }}
+                                    </div>
+                                    <div>
+                                        <p class="font-semibold text-forest-900">{{ $u->nama }}</p>
+                                        <p class="text-xs text-forest-500">{{ $u->username }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-forest-600">{{ $u->email ?? '-' }}</td>
+                            <td class="px-6 py-4">
+                                @if ($u->role?->kode === 'admin')
+                                    <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">Admin</span>
+                                @elseif ($u->role?->kode === 'surveyor')
+                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">Surveyor</span>
+                                @elseif ($u->role?->kode === 'verifikator')
+                                    <span class="inline-flex items-center rounded-full bg-amber-100/80 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Verifikator</span>
+                                @else
+                                    <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">{{ $u->role?->nama ?? '-' }}</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-forest-600">
+                                @if ($u->wilayah)
+                                    {{ $u->wilayah->nama }}
+                                @else
+                                    <span class="text-forest-400">Semua wilayah</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                @if ($u->deleted_at)
+                                    <span class="inline-flex items-center rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600">Dihapus</span>
+                                @elseif (!$u->is_aktif)
+                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">Nonaktif</span>
+                                @else
+                                    <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">Aktif</span>
+                                @endif
+                            </td>
+                            <td class="whitespace-nowrap px-6 py-4 text-right">
+                                <div class="inline-flex gap-1">
+                                    <a href="{{ route('users.edit', $u) }}"
+                                       class="inline-flex items-center gap-1 rounded-lg border border-forest-100 px-2.5 py-1.5 text-xs font-medium text-forest-700 hover:bg-forest-50" title="Edit">
+                                        <i data-lucide="pencil" class="h-3.5 w-3.5"></i>
+                                    </a>
+                                    @if ($u->id !== auth()->id())
+                                        <form method="POST" action="{{ route('users.reset-password', $u) }}" onsubmit="return confirm('Reset password untuk user {{ $u->nama }}?')" class="inline">
+                                            @csrf
+                                            <button type="submit" class="inline-flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50" title="Reset Password">
+                                                <i data-lucide="key-round" class="h-3.5 w-3.5"></i>
+                                            </button>
+                                        </form>
+                                        <form method="POST" action="{{ route('users.destroy', $u) }}" onsubmit="return confirm('Hapus user ini?')" class="inline">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50" title="Hapus">
+                                                <i data-lucide="x" class="h-3.5 w-3.5"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-6 py-12 text-center">
+                                <div class="flex flex-col items-center gap-2">
+                                    <div class="grid h-12 w-12 place-items-center rounded-full bg-forest-50">
+                                        <i data-lucide="users" class="h-6 w-6 text-forest-400"></i>
+                                    </div>
+                                    <p class="text-sm font-medium text-forest-700">Belum ada user terdaftar</p>
+                                    <p class="text-xs text-forest-500">Klik tombol "Tambah User" untuk membuat akun baru.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        @if ($users->hasPages())
+            <div class="flex items-center justify-between border-t border-forest-100 px-6 py-4">
+                <p class="text-xs text-forest-500">Menampilkan {{ $users->count() }} dari {{ $users->total() }} user</p>
+                {{ $users->withQueryString()->links() }}
+            </div>
+        @endif
+    </div>
+</div>
+
+{{-- Pop-Up Modal Password Sementara (Create & Reset Password) --}}
+@if (session('generated_password'))
+<div id="modal-generated-password" class="fixed inset-0 z-50 flex items-center justify-center bg-forest-950/60 p-4 backdrop-blur-sm">
+    <div class="w-full max-w-md overflow-hidden rounded-2xl border border-forest-100 bg-white shadow-2xl">
+        <div class="border-b border-forest-100 bg-forest-700 px-6 py-4 text-white">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i data-lucide="key-round" class="h-5 w-5 text-gold-400"></i>
+                    <h3 class="text-base font-bold">Password Sementara User</h3>
+                </div>
+                <button type="button" onclick="document.getElementById('modal-generated-password').remove()" class="rounded-lg p-1 text-cream-100 hover:bg-forest-800" title="Tutup">
+                    <i data-lucide="x" class="h-4 w-4"></i>
+                </button>
+            </div>
+            <p class="mt-1 text-xs text-cream-100/90">Simpan atau salin kredensial ini sekarang. Password hanya ditampilkan satu kali.</p>
+        </div>
+
+        <div class="space-y-4 px-6 py-5">
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-forest-500">Username</label>
+                <div class="mt-1 rounded-lg border border-forest-100 bg-cream-50 px-3.5 py-2.5">
+                    <code id="gen-username" class="text-sm font-bold text-forest-900 select-all">{{ session('generated_username') }}</code>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wider text-forest-500">Password Sementara</label>
+                <div class="mt-1 flex items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50/70 px-3.5 py-2.5">
+                    <code id="gen-password" class="font-mono text-base font-bold tracking-wider text-forest-900 select-all">{{ session('generated_password') }}</code>
+                    <button type="button" id="btn-copy-password"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-forest-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-forest-800">
+                        <i data-lucide="copy" class="h-3.5 w-3.5"></i>
+                        <span id="copy-label">Salin</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800">
+                <i data-lucide="alert-triangle" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600"></i>
+                <span>Sampaikan password ini kepada user. User wajib mengganti password saat login pertama kali.</span>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end border-t border-forest-100 bg-cream-50/60 px-6 py-3.5">
+            <button type="button" onclick="document.getElementById('modal-generated-password').remove()"
+                    class="rounded-lg bg-forest-700 px-5 py-2 text-sm font-semibold text-white hover:bg-forest-800">
+                Saya Sudah Menyimpannya
+            </button>
         </div>
     </div>
 </div>
 
+@push('scripts')
 <script>
-function userManager() {
-    return {
-        users: { data: [] },
-        loading: true,
-        showForm: false,
-        editingId: null,
+(function() {
+    const copyBtn = document.getElementById('btn-copy-password');
+    const passEl = document.getElementById('gen-password');
+    const labelEl = document.getElementById('copy-label');
+    if (!copyBtn || !passEl) return;
 
-        async loadUsers() {
-            this.loading = true;
-            const res = await fetch('/users?with_trashed=1', {
-                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-            });
-            this.users = await res.json();
-            this.loading = false;
-        },
-
-        openForm() { this.editingId = null; this.showForm = true; },
-        edit(u) { this.editingId = u.id; this.showForm = true; },
-
-        async toggleAktif(u) {
-            const res = await fetch(`/users/${u.id}/toggle-aktif`, {
-                method: 'PATCH',
-                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' }
-            });
-            if (res.ok) this.loadUsers();
-            else alert('Gagal: ' + (await res.json()).message);
-        },
-
-        async remove(u) {
-            if (!confirm('Hapus user ' + u.nama + '?')) return;
-            const res = await fetch(`/users/${u.id}`, {
-                method: 'DELETE',
-                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' }
-            });
-            if (res.ok) this.loadUsers();
-            else alert('Gagal: ' + (await res.json()).message);
-        },
-    };
-}
+    copyBtn.addEventListener('click', async function() {
+        const text = passEl.textContent.trim();
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+            }
+            if (labelEl) labelEl.textContent = 'Tersalin!';
+            setTimeout(() => { if (labelEl) labelEl.textContent = 'Salin'; }, 2000);
+        } catch (err) {
+            console.error('Gagal menyalin password:', err);
+        }
+    });
+})();
 </script>
-@endsection>
+@endpush
+@endif
+@endsection

@@ -2,236 +2,224 @@
 
 namespace App\Modules\Users\Services;
 
+use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\Wilayah;
+use App\Modules\Core\Services\AuditLogger;
+use Illuminate\Contracts\Hashing\Hasher;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * FR-05, FR-06 & FR-07: Service untuk manage user, role, wilayah tugas, dan reset password oleh Admin.
- *
- * Aturan:
- *  - Create: generate password sementara acak (12 char), set must_change_password=true
- *  - Update: hash password baru bila diisi
- *  - Reset Password: Admin generate password sementara baru (12 char), set must_change_password=true, clear lock
- *  - Nonaktifkan: toggle is_aktif (tidak hapus)
- *  - Delete: soft delete, cek constraint (tidak boleh hapus admin terakhir)
- *  - Validasi: Surveyor wajib punya wilayah, role lain wilayah kosong (null)
+ * FR-05: User management service.
  */
 class UserService
 {
-    /**
-     * Bikin user baru + generate password sementara.
-     *
-     * @return array{user: User, password_sementara: string}
-     */
-    public function create(array $data): array
-    {
-        return DB::transaction(function () use ($data) {
-            $this->validateRoleWilayah($data['role_id'] ?? null, $data['wilayah_id'] ?? null);
-
-            $passwordSementara = $this->generatePasswordSementara();
-
-            $user = User::create([
-                'role_id'              => $data['role_id'],
-                'wilayah_id'           => $data['wilayah_id'] ?? null,
-                'nama'                 => $data['nama'],
-                'username'             => $data['username'],
-                'email'                => $data['email'] ?? null,
-                'password'             => Hash::make($passwordSementara),
-                'must_change_password' => true,
-                'is_aktif'             => $data['is_aktif'] ?? true,
-            ]);
-
-            return ['user' => $user, 'password_sementara' => $passwordSementara];
-        });
+    public function __construct(
+        private readonly Hasher $hasher,
+        private readonly AuditLogger $auditLogger,
+    ) {
     }
 
-    /**
-     * Update user. Password baru di-hash bila diisi. Pakai array_key_exists() untuk handle explicit null.
-     */
-    public function update(User $user, array $data): User
+    public function generatePassword(): string
     {
-        return DB::transaction(function () use ($user, $data) {
-            $targetRoleId = array_key_exists('role_id', $data) ? $data['role_id'] : $user->role_id;
-            $targetWilayahId = array_key_exists('wilayah_id', $data) ? $data['wilayah_id'] : $user->wilayah_id;
+        $alphabet = (string) config('rumahasa.password_alphabet',
+            'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789');
 
-            // Cegah admin mengubah role diri sendiri menjadi non-admin
-            if (auth()->id() === $user->id && $targetRoleId !== $user->role_id) {
-                $targetRole = Role::find($targetRoleId);
-                if ($user->isAdmin() && $targetRole && !$targetRole->isAdmin()) {
-                    throw new \RuntimeException('Anda tidak dapat mengubah role akun sendiri menjadi non-admin.');
-                }
+        $length = (int) config('rumahasa.password_length', 12);
+        $length = max(8, min(64, $length));
+
+        $alphabetLen = strlen($alphabet);
+        if ($alphabetLen < 8) {
+            $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+            $alphabetLen = strlen($alphabet);
+        }
+
+        do {
+            $plain = '';
+            $bytes = random_bytes($length);
+            for ($i = 0; $i < $length; $i++) {
+                $plain .= $alphabet[ord($bytes[$i]) % $alphabetLen];
             }
+        } while (
+            !preg_match('/[A-Z]/', $plain)
+            || !preg_match('/[a-z]/', $plain)
+            || !preg_match('/[0-9]/', $plain)
+        );
 
-            $this->validateRoleWilayah($targetRoleId, $targetWilayahId, $user);
-
-            $updateData = [
-                'role_id'    => $targetRoleId,
-                'wilayah_id' => $targetWilayahId,
-                'nama'       => array_key_exists('nama', $data) ? $data['nama'] : $user->nama,
-                'username'   => array_key_exists('username', $data) ? $data['username'] : $user->username,
-                'email'      => array_key_exists('email', $data) ? $data['email'] : $user->email,
-                'is_aktif'   => array_key_exists('is_aktif', $data) ? $data['is_aktif'] : $user->is_aktif,
-            ];
-
-            // Hash password baru bila diisi
-            if (!empty($data['password'])) {
-                $updateData['password'] = Hash::make($data['password']);
-                $updateData['must_change_password'] = true;
-            }
-
-            $user->update($updateData);
-
-            return $user->fresh();
-        });
+        return $plain;
     }
 
-    /**
-     * FR-07: Reset password user oleh Admin.
-     * - Bungkus dalam atomic DB transaction
-     * - Cegah Admin mereset password akun sendiri
-     * - Generate password sementara baru (12 char alphanumeric)
-     * - Set must_change_password = true (wajib ganti saat login berikutnya)
-     * - Clear locked_until & failed_login_count (unlock akun kalau ke-lock)
-     * - Clear password_changed_at = null
-     * - Invalidate remember token lama
-     * - Pertahankan role_id, wilayah_id, dan is_aktif
-     *
-     * @return array{user: User, password_sementara: string}
-     */
+    public function hashPassword(string $plaintext): string
+    {
+        return $this->hasher->make($plaintext);
+    }
+
+    public function normalizeUsername(string $username): string
+    {
+        return strtolower(trim($username));
+    }
+
+    public function createUser(array $data): array
+    {
+        $plain = $this->generatePassword();
+        $hashed = $this->hashPassword($plain);
+
+        $payload = [
+            'role_id'              => (int) $data['role_id'],
+            'wilayah_id'           => $data['wilayah_id'] ?? null,
+            'nama'                 => trim((string) $data['nama']),
+            'username'             => $this->normalizeUsername((string) $data['username']),
+            'email'                => isset($data['email']) && $data['email'] !== ''
+                ? strtolower(trim((string) $data['email']))
+                : null,
+            'password'             => $hashed,
+            'must_change_password' => true,
+            'is_aktif'             => (bool) ($data['is_aktif'] ?? true),
+            'failed_login_count'   => 0,
+            'locked_until'         => null,
+        ];
+
+        $user = DB::transaction(function () use ($payload) {
+            return User::create($payload);
+        });
+
+        $this->auditLogger->catat(
+            aksi:      AuditLog::AKSI['USER_CREATE'],
+            entitas:   'users',
+            entitasId: $user->id,
+            dataBaru:  [
+                'role_id'  => $user->role_id,
+                'username' => $user->username,
+                'nama'     => $user->nama,
+                'is_aktif' => $user->is_aktif,
+            ],
+        );
+
+        return [
+            'user'               => $user,
+            'password_plaintext' => $plain,
+        ];
+    }
+
+    public function updateUser(User $user, array $data): User
+    {
+        $dataLama = $user->only(['role_id', 'wilayah_id', 'nama', 'username', 'email', 'is_aktif']);
+
+        $user->forceFill([
+            'role_id'    => (int) $data['role_id'],
+            'wilayah_id' => array_key_exists('wilayah_id', $data) ? $data['wilayah_id'] : $user->wilayah_id,
+            'nama'       => trim((string) $data['nama']),
+            'username'   => $this->normalizeUsername((string) $data['username']),
+            'email'      => isset($data['email']) && $data['email'] !== ''
+                ? strtolower(trim((string) $data['email']))
+                : null,
+            'is_aktif'   => (bool) ($data['is_aktif'] ?? $user->is_aktif),
+        ])->save();
+
+        $this->auditLogger->catat(
+            aksi:      AuditLog::AKSI['USER_UPDATE'],
+            entitas:   'users',
+            entitasId: $user->id,
+            dataBaru:  $user->fresh()->only(['role_id', 'wilayah_id', 'nama', 'username', 'email', 'is_aktif']),
+            dataLama:  $dataLama,
+        );
+
+        return $user->fresh();
+    }
+
     public function resetPassword(User $user): array
     {
-        return DB::transaction(function () use ($user) {
-            if (auth()->id() === $user->id) {
-                throw new \RuntimeException('Anda tidak dapat mereset password akun sendiri. Gunakan menu Ganti Password.');
-            }
+        $plain  = $this->generatePassword();
+        $hashed = $this->hashPassword($plain);
 
-            $passwordSementara = $this->generatePasswordSementara();
+        $user->forceFill([
+            'password'             => $hashed,
+            'must_change_password' => true,
+            'password_changed_at'  => null,
+            'failed_login_count'   => 0,
+            'locked_until'         => null,
+        ]);
+        $user->setRememberToken(Str::random(60));
+        $user->save();
 
-            $user->forceFill([
-                'password'              => Hash::make($passwordSementara),
-                'must_change_password'  => true,
-                'password_changed_at'    => null,
-                'locked_until'           => null,
-                'failed_login_count'     => 0,
-            ])->save();
+        $this->auditLogger->catat(
+            aksi:      AuditLog::AKSI['PASSWORD_RESET_BY_ADMIN'],
+            entitas:   'users',
+            entitasId: $user->id,
+            dataBaru:  ['reset_at' => now()->toDateTimeString()],
+        );
 
-            // Invalidate remember token
-            $user->setRememberToken(Str::random(60));
-            $user->save();
+        return [
+            'user'               => $user->fresh(),
+            'password_plaintext' => $plain,
+        ];
+    }
 
-            return ['user' => $user->fresh(), 'password_sementara' => $passwordSementara];
+    public function deleteUser(User $user): void
+    {
+        DB::transaction(function () use ($user) {
+            $user->delete();
+
+            $this->auditLogger->catat(
+                aksi:      AuditLog::AKSI['USER_DELETE'],
+                entitas:   'users',
+                entitasId: $user->id,
+                dataLama:  ['username' => $user->username, 'nama' => $user->nama],
+            );
         });
     }
 
-    /**
-     * Toggle is_aktif.
-     */
+    public function restoreUser(int $userId): ?User
+    {
+        $user = User::withTrashed()->find($userId);
+        if (!$user) {
+            return null;
+        }
+
+        $user->restore();
+
+        $this->auditLogger->catat(
+            aksi:      AuditLog::AKSI['USER_RESTORE'],
+            entitas:   'users',
+            entitasId: $user->id,
+        );
+
+        return $user->fresh();
+    }
+
     public function toggleAktif(User $user): User
     {
         return DB::transaction(function () use ($user) {
-            // Cegah admin menonaktifkan diri sendiri
-            if (auth()->id() === $user->id) {
-                throw new \RuntimeException('Anda tidak dapat menonaktifkan akun sendiri.');
-            }
-
-            // Cegah menonaktifkan admin terakhir yang aktif
             if ($user->isAdmin() && $user->is_aktif) {
                 $adminAktifCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
                     ->where('is_aktif', true)
                     ->whereNull('deleted_at')
                     ->lockForUpdate()
+                    ->get(['id'])
                     ->count();
+
                 if ($adminAktifCount <= 1) {
                     throw new \RuntimeException('Tidak dapat menonaktifkan admin terakhir yang aktif.');
                 }
             }
 
-            $user->update(['is_aktif' => !$user->is_aktif]);
+            $baru = !$user->is_aktif;
+            $user->forceFill(['is_aktif' => $baru])->save();
+
+            $this->auditLogger->catat(
+                aksi:      $baru ? AuditLog::AKSI['USER_ACTIVATE'] : AuditLog::AKSI['USER_DEACTIVATE'],
+                entitas:   'users',
+                entitasId: $user->id,
+                dataBaru:  ['is_aktif' => $baru],
+            );
 
             return $user->fresh();
         });
     }
 
-    /**
-     * Soft delete user.
-     */
-    public function delete(User $user): void
+    public function listRoles(): array
     {
-        DB::transaction(function () use ($user) {
-            // Cegah admin menghapus diri sendiri
-            if (auth()->id() === $user->id) {
-                throw new \RuntimeException('Anda tidak dapat menghapus akun sendiri.');
-            }
-
-            if ($user->isAdmin()) {
-                $adminCount = User::whereHas('role', fn ($q) => $q->where('kode', 'admin'))
-                    ->whereNull('deleted_at')
-                    ->lockForUpdate()
-                    ->count();
-                if ($adminCount <= 1) {
-                    throw new \RuntimeException('Tidak dapat menghapus admin terakhir.');
-                }
-            }
-
-            $user->delete();
-        });
-    }
-
-    public function restore(int $userId): User
-    {
-        $user = User::withTrashed()->findOrFail($userId);
-        $user->restore();
-        return $user->fresh();
-    }
-
-    /**
-     * Generate password sementara: 12 char alphanumeric (sesuai AlphanumericPassword rule).
-     */
-    private function generatePasswordSementara(): string
-    {
-        // Pastikan ada kombinasi huruf besar, kecil, dan angka
-        do {
-            $pwd = Str::random(12);
-        } while (
-            !preg_match('/[A-Z]/', $pwd)
-            || !preg_match('/[a-z]/', $pwd)
-            || !preg_match('/[0-9]/', $pwd)
-        );
-        return $pwd;
-    }
-
-    /**
-     * Validasi: Surveyor wajib punya wilayah, role lain wilayah harus null.
-     */
-    public function validateRoleWilayah(?int $roleId, ?int $wilayahId, ?User $exceptUser = null): void
-    {
-        if (!$roleId) {
-            throw new \InvalidArgumentException('Role wajib dipilih.');
-        }
-
-        $role = Role::find($roleId);
-        if (!$role) {
-            throw new \InvalidArgumentException('Role tidak ditemukan.');
-        }
-
-        if ($role->kode === 'surveyor') {
-            if (!$wilayahId) {
-                throw new \InvalidArgumentException('Surveyor wajib memiliki wilayah tugas.');
-            }
-            if (!Wilayah::find($wilayahId)) {
-                throw new \InvalidArgumentException('Wilayah tugas tidak ditemukan.');
-            }
-        } else {
-            // Verifikator / Admin / Pimpinan: wilayah harus null
-            if ($wilayahId) {
-                throw new \InvalidArgumentException(
-                    "Role {$role->nama} tidak boleh memiliki wilayah tugas (lihat semua wilayah)."
-                );
-            }
-        }
+        return Role::orderBy('id')->get(['id', 'kode', 'nama'])->toArray();
     }
 }

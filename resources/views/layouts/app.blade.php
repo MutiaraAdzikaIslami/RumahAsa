@@ -18,9 +18,41 @@
             theme: {
                 extend: {
                     colors: {
-                        forest: { DEFAULT: '#1D4034', light: '#2A5244', dark: '#152C23', accent: '#3E6B5A' },
-                        cream: { DEFAULT: '#F2EFE8', light: '#FFFFFF', dark: '#E8E4DC' },
+                        forest: {
+                            DEFAULT: '#1D4034',
+                            light: '#2A5244',
+                            dark: '#152C23',
+                            accent: '#3E6B5A',
+                            50: '#EEF5F1',
+                            100: '#D6E6DE',
+                            200: '#B0CEBF',
+                            300: '#84B19C',
+                            400: '#589378',
+                            500: '#3B785D',
+                            600: '#2D604A',
+                            700: '#244E3C',
+                            800: '#1D4034',
+                            900: '#152E25',
+                            950: '#0C1C16',
+                        },
+                        cream: {
+                            DEFAULT: '#F2EFE8',
+                            light: '#FFFFFF',
+                            dark: '#E8E4DC',
+                            50: '#FAF9F6',
+                            100: '#F2EFE8',
+                            200: '#E6E2D8',
+                        },
                         terracotta: { DEFAULT: '#E8B87D', light: '#F0C99A' },
+                        gold: {
+                            400: '#E8B87D',
+                            500: '#D49A55',
+                            600: '#B87A35',
+                        },
+                        clay: {
+                            100: '#F7EFE5',
+                            600: '#9A5B25',
+                        },
                     },
                     fontFamily: {
                         sans: ['"Plus Jakarta Sans"', 'sans-serif'],
@@ -520,6 +552,7 @@
         </div>
     </div>
 
+    @stack('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             lucide.createIcons();

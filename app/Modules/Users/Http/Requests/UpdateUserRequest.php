@@ -2,6 +2,8 @@
 
 namespace App\Modules\Users\Http\Requests;
 
+use App\Models\Role;
+use App\Models\User;
 use App\Modules\Core\Rules\AlphanumericPassword;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -18,14 +20,44 @@ class UpdateUserRequest extends FormRequest
         $userId = $this->route('user')->id ?? $this->route('user');
 
         return [
-            'nama'        => ['required', 'string', 'max:150'],
-            'username'    => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($userId)],
-            'email'       => ['nullable', 'email', 'max:100', Rule::unique('users', 'email')->ignore($userId)],
-            'role_id'     => ['required', 'exists:roles,id'],
-            'wilayah_id'  => ['nullable', 'exists:wilayah,id'],
-            'password'    => ['nullable', 'string', new AlphanumericPassword()],
-            'is_aktif'    => ['boolean'],
+            'nama'       => ['required', 'string', 'max:150'],
+            'username'   => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($userId)],
+            'email'      => ['nullable', 'email', 'max:100', Rule::unique('users', 'email')->ignore($userId)],
+            'role_id'    => ['required', 'exists:roles,id'],
+            'wilayah_id' => ['nullable', 'exists:wilayah,id'],
+            'password'   => ['nullable', 'string', new AlphanumericPassword()],
+            'is_aktif'   => ['boolean'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            $role = Role::find($this->input('role_id'));
+            if (!$role) {
+                return;
+            }
+
+            $routeUser = $this->route('user');
+            $effectiveWilayahId = $this->exists('wilayah_id')
+                ? $this->input('wilayah_id')
+                : ($routeUser instanceof User ? $routeUser->wilayah_id : null);
+
+            if ($role->kode === 'surveyor') {
+                if (empty($effectiveWilayahId)) {
+                    $validator->errors()->add('wilayah_id', 'Surveyor wajib memiliki wilayah tugas.');
+                }
+            } elseif (!empty($effectiveWilayahId)) {
+                $validator->errors()->add(
+                    'wilayah_id',
+                    "Role {$role->nama} tidak boleh memiliki wilayah tugas (lihat semua wilayah)."
+                );
+            }
+        });
     }
 
     public function messages(): array
